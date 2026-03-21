@@ -453,30 +453,39 @@ function startGPS(){
   }
   let done=false;
 
-  // Timeout JS de 5 secondes — contourne les bugs iPhone où getCurrentPosition ne rappelle jamais
+  // ── Timeout dur de 5 secondes ────────────────────────
+  // Si le GPS ne répond pas dans ce délai, on passe en mode
+  // "GPS non disponible" et on laisse l'employé pointer quand même.
   const killTimer=setTimeout(()=>{
     if(done) return;
     done=true;
+    // Arrêter toute écoute GPS en cours
     if(gpsWatch!==null){ navigator.geolocation.clearWatch(gpsWatch); gpsWatch=null; }
     S.gpsStatus='timeout'; S.detectedSite=null;
     updateGPSUI('timeout',null);
+    console.log('GPS: timeout 5s — abandon');
   },5000);
 
-  // On essaie d'abord un fix rapide avec maximumAge élevé (cache acceptable)
   navigator.geolocation.getCurrentPosition(
     pos=>{
-      if(done) return; // si le timeout a déjà frappé, ignorer
-      done=true; clearTimeout(killTimer);
+      if(done) return; // timeout déjà déclenché, ignorer
+      done=true;
+      clearTimeout(killTimer);
       onGPS(pos);
-      // Continuer à surveiller pour mises à jour
-      gpsWatch=navigator.geolocation.watchPosition(onGPS, ()=>{}, {
-        enableHighAccuracy:true, timeout:10000, maximumAge:60000
-      });
+      // Surveiller les mises à jour de position (ex: l'employé se déplace)
+      // Le watchPosition a son propre timeout de 8s par fix — s'il échoue il rappelle onGPSErr
+      gpsWatch=navigator.geolocation.watchPosition(
+        onGPS,
+        ()=>{ /* erreur watch — on garde le dernier fix connu, pas de reset */ },
+        {enableHighAccuracy:true, timeout:8000, maximumAge:60000}
+      );
     },
     err=>{
       if(done) return;
-      done=true; clearTimeout(killTimer);
+      done=true;
+      clearTimeout(killTimer);
       onGPSErr(err);
+      console.log('GPS: erreur —', err.code, err.message);
     },
     {enableHighAccuracy:true, timeout:4500, maximumAge:30000}
   );
