@@ -719,7 +719,11 @@ async function confirmPhoto(){
     photoRef:photoRef,                          // référence Supabase
     photo:photoRef?null:S.capturedPhoto         // fallback base64 si hors ligne
   });
-  saveRec(rec); showToast('Pointage enregistré ✓','success'); showEmpScreen(emp);
+  saveRec(rec);
+  showToast('Pointage enregistré ✓','success');
+  showEmpScreen(emp);
+  // Sync automatique en arrière-plan
+  if(S.isOnline) supaUpsertRecord(rec).catch(e=>console.warn('Auto-sync failed',e));
 }
 
 function logout(){S.currentEmp=null;lockBuf='';dots('d',0);showScreen('screen-lock')}
@@ -808,7 +812,7 @@ function buildRow(emp,rec,dk,showP){
   const pCol=showP?`<td style="font-size:.7rem;color:var(--text3)">${evs.filter(e=>e.type==='pause_start').length||'—'}</td>`:'';
   const gCol=!showP?`<td style="font-size:.7rem">${oz||(sEv?.gps?'✓':'—')}</td>`:'';
   const stCol=showP?`<td>${stat}</td>`:'';
-  return`<tr><td>${ph}</td><td>${emp.name}</td><td><span class="badge ${sc}">${site}</span>${oz?` <span title="Hors zone">⚠️</span>`:''}</td><td>${st(sEv)}</td>${pCol}<td>${st(eEv)}</td>${gCol}<td style="font-family:var(--font-mono)">${totStr}</td>${stCol}<td><button class="sb" style="font-size:.68rem;padding:4px 8px" onclick="openEdit('${emp.id}','${dk}')">✏️</button></td></tr>`;
+  return`<tr><td>${ph}</td><td>${emp.name}</td><td><span class="badge ${sc}">${site}</span>${oz?` <span title="Hors zone">⚠️</span>`:''}</td><td>${st(sEv)}</td>${pCol}<td>${st(eEv)}</td>${gCol}<td style="font-family:var(--font-mono)">${totStr}</td>${stCol}<td><button class="sb" style="font-size:.68rem;padding:4px 8px" onclick="openEdit('${emp.id}','${dk}')">✏️</button> <button class="sb danger" style="font-size:.68rem;padding:4px 8px" onclick="deleteEntry('${emp.id}','${dk}')">🗑️</button></td></tr>`;
 }
 
 function calcTot(evs){
@@ -854,6 +858,9 @@ function openEdit(empId,dk){
   document.getElementById('edit-start').value=sEv?(sEv.correctedTime||sEv.time):'';
   document.getElementById('edit-end').value=eEv?(eEv.correctedTime||eEv.time):'';
   document.getElementById('edit-why').value='';
+  // Stocker les valeurs min pour validation
+  document.getElementById('edit-start').dataset.orig=sEv?(sEv.correctedTime||sEv.time):'';
+  document.getElementById('edit-end').dataset.minTime=sEv?(sEv.correctedTime||sEv.time):'';
   openM('m-edit');
 }
 
@@ -863,6 +870,33 @@ function saveEdit(){
   const why=document.getElementById('edit-why').value||'Correction manager';
   const recs=getRecs(); let rec=recs.find(r=>r.empId===empId&&r.date===dk);
   if(!rec){rec=newRec(empId,'?');recs.push(rec)}
+
+  // ── VALIDATION CHRONOLOGIQUE ──────────────────────────
+  const evs=rec.events;
+  const sEv=evs.find(e=>e.type==='start');
+  const pauseStartEv=evs.find(e=>e.type==='pause_start');
+  const pauseEndEv=evs.find(e=>e.type==='pause_end');
+
+  // Heure début ne peut pas être après une pause ou une fin
+  if(ns && pauseStartEv){
+    const ps=pauseStartEv.correctedTime||pauseStartEv.time;
+    if(ns>=ps){showToast(`Début (${ns}) doit être avant la pause (${ps})`,'error');return;}
+  }
+  // Heure fin ne peut pas être avant le début ni avant une pause
+  if(ne){
+    const startRef=ns||(sEv?.correctedTime||sEv?.time);
+    if(startRef && ne<=startRef){showToast(`Fin (${ne}) doit être après le début (${startRef})`,'error');return;}
+    if(pauseStartEv){
+      const ps=pauseStartEv.correctedTime||pauseStartEv.time;
+      if(ne<=ps){showToast(`Fin (${ne}) doit être après la pause (${ps})`,'error');return;}
+    }
+    if(pauseEndEv){
+      const pe=pauseEndEv.correctedTime||pauseEndEv.time;
+      if(ne<=pe){showToast(`Fin (${ne}) doit être après la fin de pause (${pe})`,'error');return;}
+    }
+  }
+  // ─────────────────────────────────────────────────────
+
   if(ns){let ev=rec.events.find(e=>e.type==='start');if(ev){ev.corrected=true;ev.correctedTime=ns}else rec.events.unshift({type:'start',time:ns,corrected:true,correctedTime:ns,timestamp:new Date().toISOString(),site:rec.site})}
   if(ne){let ev=rec.events.find(e=>e.type==='end');if(ev){ev.corrected=true;ev.correctedTime=ne}else rec.events.push({type:'end',time:ne,corrected:true,correctedTime:ne,timestamp:new Date().toISOString(),site:rec.site})}
   if(!rec.correctionLog) rec.correctionLog=[];
@@ -870,6 +904,17 @@ function saveEdit(){
   S_('records',recs); closeM('m-edit'); renderTodayTbl();
   if(document.getElementById('t-hist').style.display!=='none') loadHist();
   showToast('Correction enregistrée ✓','success');
+}
+
+function deleteEntry(empId,dk){
+  const emp=getEmps().find(e=>e.id===empId);
+  const empName=emp?.name||empId;
+  if(!confirm(`Supprimer entièrement le pointage de ${empName} du ${dk} ?\n\nCette action est irréversible.`)) return;
+  const recs=getRecs().filter(r=>!(r.empId===empId&&r.date===dk));
+  S_('records',recs);
+  renderTodayTbl();
+  if(document.getElementById('t-hist').style.display!=='none') loadHist();
+  showToast(`Pointage de ${empName} supprimé`,'error');
 }
 
 // ── PHOTO VIEWER ─────────────────────────────────────
@@ -916,10 +961,106 @@ function exportCSV(mode){
   showToast('Export CSV téléchargé ✓','success');
 }
 
-function syncNow(){
+// ── SYNC DEPUIS SUPABASE (démarrage) ─────────────────
+async function syncFromSupabase(){
+  try{
+    // Charger les employés
+    const rEmp=await fetch(`${SUPA_URL}/rest/v1/employees?select=*`,{
+      headers:{'Authorization':`Bearer ${SUPA_KEY}`,'apikey':SUPA_KEY}
+    });
+    if(rEmp.ok){
+      const emps=await rEmp.json();
+      if(emps.length){
+        // Fusionner avec le localStorage — Supabase a priorité
+        const local=getEmps();
+        const merged=emps.map(e=>({id:e.id,name:e.name,pin:e.pin,createdAt:e.created_at}));
+        // Garder les employés locaux non encore sync
+        local.forEach(le=>{ if(!merged.find(e=>e.id===le.id)) merged.push(le); });
+        S_('employees',merged);
+      }
+    }
+    // Charger les pointages du mois en cours
+    const month=new Date().toISOString().slice(0,7);
+    const rRec=await fetch(`${SUPA_URL}/rest/v1/records?date=gte.${month}-01&select=*`,{
+      headers:{'Authorization':`Bearer ${SUPA_KEY}`,'apikey':SUPA_KEY}
+    });
+    if(rRec.ok){
+      const recs=await rRec.json();
+      if(recs.length){
+        const local=getRecs();
+        recs.forEach(r=>{
+          const idx=local.findIndex(l=>l.id===r.id);
+          const rec={id:r.id,empId:r.emp_id,site:r.site,date:r.date,events:r.events||[],correctionLog:r.correction_log||[]};
+          if(idx>=0) local[idx]=rec; else local.push(rec);
+        });
+        S_('records',local);
+      }
+    }
+    console.log('✅ Sync Supabase → local OK');
+  }catch(e){
+    console.warn('syncFromSupabase failed',e);
+  }
+}
+
+async function supaUpsertRecord(rec){
+  const emps=getEmps();
+  const emp=emps.find(e=>e.id===rec.empId);
+  const payload={
+    id:rec.id, emp_id:rec.empId, emp_name:emp?.name||rec.empId,
+    site:rec.site, date:rec.date,
+    events:rec.events.map(e=>({...e,photo:null})), // on n'envoie pas le base64
+    correction_log:rec.correctionLog||[],
+    updated_at:new Date().toISOString()
+  };
+  const resp=await fetch(`${SUPA_URL}/rest/v1/records`,{
+    method:'POST',
+    headers:{
+      'Authorization':`Bearer ${SUPA_KEY}`,
+      'apikey':SUPA_KEY,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=merge-duplicates'
+    },
+    body:JSON.stringify(payload)
+  });
+  if(!resp.ok) throw new Error('Upsert record failed: '+resp.status);
+}
+
+async function supaUpsertEmployees(){
+  const emps=getEmps();
+  const resp=await fetch(`${SUPA_URL}/rest/v1/employees`,{
+    method:'POST',
+    headers:{
+      'Authorization':`Bearer ${SUPA_KEY}`,
+      'apikey':SUPA_KEY,
+      'Content-Type':'application/json',
+      'Prefer':'resolution=merge-duplicates'
+    },
+    body:JSON.stringify(emps.map(e=>({id:e.id,name:e.name,pin:e.pin,created_at:e.createdAt||new Date().toISOString()})))
+  });
+  if(!resp.ok) throw new Error('Upsert employees failed: '+resp.status);
+}
+
+async function syncNow(){
   if(!S.isOnline){showToast('Pas de connexion','error');return}
-  showToast('Synchronisation…','');
-  setTimeout(()=>{S_('pendingSync',[]);refreshMgr();showToast('Synchronisation complète ✓','success')},1400);
+  showToast('Synchronisation en cours…','');
+  try{
+    // Sync employés
+    await supaUpsertEmployees();
+    // Sync tous les pointages en attente
+    const recs=getRecs();
+    let ok=0,fail=0;
+    for(const rec of recs){
+      try{await supaUpsertRecord(rec);ok++;}
+      catch(e){fail++;console.warn('Record sync failed',rec.id,e);}
+    }
+    S_('pendingSync',[]);
+    refreshMgr();
+    if(fail===0) showToast(`Synchronisation complète ✓ (${ok} pointage${ok>1?'s':''})','success');
+    else showToast(`Sync partielle : ${ok} ok, ${fail} erreur(s)`,'error');
+  }catch(e){
+    console.error('Sync failed',e);
+    showToast('Erreur de synchronisation','error');
+  }
 }
 
 // ── PIN CHANGE ────────────────────────────────────────
@@ -970,6 +1111,8 @@ document.addEventListener('DOMContentLoaded', function() {
   purge();
   startGPS();
   showScreen('screen-lock');
+  // Sync au démarrage — charger depuis Supabase en arrière-plan
+  if(navigator.onLine) syncFromSupabase();
   // Fermeture modales au clic extérieur
   document.querySelectorAll('.modal-overlay').forEach(m =>
     m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); })
