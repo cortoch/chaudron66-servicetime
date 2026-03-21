@@ -77,17 +77,21 @@ created_at timestamptz
 - [x] Photo avec watermark horodaté (nom, site, GPS, date/heure)
 - [x] Timeline des événements du jour par employé
 - [x] Actions : Début de service, Pause, Reprise, Fin de service
+- [x] **Pauses multiples** — un employé peut faire plusieurs pauses dans la journée
 - [x] Horloge temps réel en haut de page
 
 ### Manager
 - [x] Tableau des pointages du jour avec filtres par site
 - [x] Historique consultable par date
 - [x] Gestion des employés (ajout, suppression, PIN)
-- [x] Correction des horodatages avec validation chronologique :
+- [x] Correction des horodatages avec validation chronologique complète :
   - Fin ne peut pas être avant le début
-  - Début ne peut pas être après une pause existante
+  - Début ne peut pas être après la première pause existante
+  - Fin ne peut pas être avant la dernière pause existante
+  - Gère correctement les **pauses multiples**
   - Message d'erreur précis avec les heures en conflit
 - [x] Suppression complète d'une entrée (avec confirmation)
+- [x] Colonne Pauses affiche le nombre ET la durée totale cumulée (`2× (0h45)`)
 - [x] Export CSV (jour / mois)
 
 ### Stockage & synchronisation
@@ -103,8 +107,9 @@ created_at timestamptz
   - Alerte ⚠️ "Heure suspecte" visible dans le tableau manager si écart > 2 min
   - Détail au survol : heure locale, heure serveur, écart en minutes
   - Non bloquant — signalement uniquement
+  - Flag `timeTamper` stocké dans l'événement Supabase
 - [x] Alerte pause obligatoire (Code du travail – Art. L3121-16)
-  - Affiché sur l'écran employé si > 6h travaillées sans pause
+  - Affiché sur l'écran employé si > 6h travaillées sans aucune pause
   - Rafraîchissement automatique toutes les minutes
 
 ### Interface & UX
@@ -136,7 +141,7 @@ created_at timestamptz
   - Arrivée / départ de chaque employé
   - ⚠️ Heure suspecte (triche potentielle)
   - ⚠️ Pointage hors zone GPS
-  - ⚠️ Pause obligatoire dépassée > 6h
+  - ⚠️ Pause obligatoire dépassée > 6h sans aucune pause
 - [ ] SMS pour les alertes critiques uniquement (heure suspecte + hors zone)
 
 ### À discuter / décider
@@ -172,3 +177,5 @@ chaudron66-servicetime/
 - Clé Supabase incorrecte (publishable au lieu de anon) → photos non uploadées
 - Logo absent dans `dashboard.html`
 - GPS : timeout renforcé pour éviter les blocages sur Safari iOS en `file://`
+- Pauses multiples : validation chronologique dans `saveEdit` ne prenait que la première pause
+- Pauses multiples : colonne "Pauses" n'affichait que le nombre, pas la durée totale
