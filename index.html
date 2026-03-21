@@ -382,6 +382,33 @@ const SITES = {
   Cabestany: { lat:42.6725, lng:2.9430,  r:150, label:'Cabestany', addr:'20 av. André Ampère, 66330 Cabestany' },
 };
 
+// ── VÉRIFICATION HEURE SERVEUR ───────────────────────
+async function checkServerTime(){
+  try{
+    // On utilise l'endpoint Supabase qui retourne l'heure serveur
+    const resp = await fetch(`${SUPA_URL}/rest/v1/`, {
+      headers:{'apikey':SUPA_KEY}
+    });
+    // L'heure serveur est dans le header Date
+    const serverDate = new Date(resp.headers.get('Date'));
+    const localDate = new Date();
+    const diffSeconds = Math.round((localDate - serverDate) / 1000);
+    const diffMinutes = Math.abs(diffSeconds) / 60;
+    if(diffMinutes >= 2){
+      return {
+        ok: false,
+        diff: diffSeconds,
+        serverTime: serverDate.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),
+        localTime: localDate.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
+      };
+    }
+    return { ok: true, diff: diffSeconds };
+  } catch(e){
+    console.warn('checkServerTime failed', e);
+    return { ok: true, diff: 0 }; // si pas de réseau, on laisse passer
+  }
+}
+
 // ── STATE ─────────────────────────────────────────────
 let S = {
   gpsStatus:'locating', detectedSite:null, gpsCoords:null,
@@ -625,7 +652,8 @@ function renderTL(emp){
   const dc={start:'start',pause_start:'pause',pause_end:'pause',end:'end'};
   el.innerHTML=rec.events.map(ev=>{
     const t=ev.corrected?`<span class="corr">${ev.correctedTime||ev.time}</span>`:ev.time;
-    return`<div class="timeline-item"><div class="tl-dot ${dc[ev.type]||'start'}"></div><div class="tl-time">${t}</div><div class="tl-label">${labs[ev.type]||ev.type}</div>${ev.corrected?'<div class="tl-corr">✏️ corrigé</div>':''}</div>`;
+    const tampWarn=ev.timeTamper?` <span style="color:var(--danger);font-size:.65rem" title="Heure locale: ${ev.timeTamper.localTime} / Serveur: ${ev.timeTamper.serverTime}">⚠️</span>`:'';
+    return`<div class="timeline-item"><div class="tl-dot ${dc[ev.type]||'start'}"></div><div class="tl-time">${t}${tampWarn}</div><div class="tl-label">${labs[ev.type]||ev.type}</div>${ev.corrected?'<div class="tl-corr">✏️ corrigé</div>':''}</div>`;
   }).join('');
   renderPauseAlert(rec);
 }
@@ -713,6 +741,21 @@ async function confirmPhoto(){
   const emp=S.currentEmp, site=S.detectedSite||'Hors zone';
   let rec=getEmpRec(emp.id)||newRec(emp.id,site);
 
+  // ── Vérification heure serveur ────────────────────────
+  let timeTamper=null;
+  if(S.isOnline){
+    const check=await checkServerTime();
+    if(!check.ok){
+      // Écart détecté — on enregistre pour le manager
+      timeTamper={
+        diffSeconds:check.diff,
+        serverTime:check.serverTime,
+        localTime:check.localTime
+      };
+      console.warn(`⚠️ Écart heure détecté : local=${check.localTime} serveur=${check.serverTime} (${check.diff}s)`);
+    }
+  }
+
   // Nom de fichier unique
   const fname=`${emp.id}_${now.toISOString().replace(/[:.]/g,'-')}_${S.currentAction}.jpg`;
   showToast('Envoi de la photo…','');
@@ -725,13 +768,13 @@ async function confirmPhoto(){
   rec.events.push({
     type:S.currentAction,time:timeStr,timestamp:now.toISOString(),
     site,gps:S.gpsCoords,outOfZone:!S.detectedSite,corrected:false,
-    photoRef:photoRef,                          // référence Supabase
-    photo:photoRef?null:S.capturedPhoto         // fallback base64 si hors ligne
+    photoRef:photoRef,
+    photo:photoRef?null:S.capturedPhoto,
+    timeTamper:timeTamper  // null si heure OK, objet si écart détecté
   });
   saveRec(rec);
   showToast('Pointage enregistré ✓','success');
   showEmpScreen(emp);
-  // Sync automatique en arrière-plan
   if(S.isOnline) supaUpsertRecord(rec).catch(e=>console.warn('Auto-sync failed',e));
 }
 
@@ -811,6 +854,9 @@ function buildRow(emp,rec,dk,showP){
   const site=rec?.site||'—'; const tot=calcTot(evs);
   const totStr=tot>0?`${Math.floor(tot/60)}h${String(tot%60).padStart(2,'0')}`:'—';
   const st=t=>t?(t.corrected?`<span class="corr">${t.correctedTime||t.time}</span>`:t.time):'—';
+  // Détecter une manipulation d'horloge sur n'importe quel événement
+  const tamperEv=evs.find(e=>e.timeTamper);
+  const tamperBadge=tamperEv?`<span title="Heure locale: ${tamperEv.timeTamper.localTime} / Serveur: ${tamperEv.timeTamper.serverTime} (écart ${Math.round(Math.abs(tamperEv.timeTamper.diffSeconds)/60)} min)" style="color:var(--danger);cursor:help;font-size:.75rem">⚠️ Heure suspecte</span>`:'';
   const last=evs[evs.length-1]; const inP=last?.type==='pause_start'; const hasS=!!sEv, hasE=!!eEv;
   let stat='<span class="badge bo">Non pointé</span>';
   if(hasS&&!hasE) stat=inP?'<span class="badge bp">Pause</span>':'<span class="badge bw">En service</span>';
@@ -821,7 +867,7 @@ function buildRow(emp,rec,dk,showP){
   const pCol=showP?`<td style="font-size:.7rem;color:var(--text3)">${evs.filter(e=>e.type==='pause_start').length||'—'}</td>`:'';
   const gCol=!showP?`<td style="font-size:.7rem">${oz||(sEv?.gps?'✓':'—')}</td>`:'';
   const stCol=showP?`<td>${stat}</td>`:'';
-  return`<tr><td>${ph}</td><td>${emp.name}</td><td><span class="badge ${sc}">${site}</span>${oz?` <span title="Hors zone">⚠️</span>`:''}</td><td>${st(sEv)}</td>${pCol}<td>${st(eEv)}</td>${gCol}<td style="font-family:var(--font-mono)">${totStr}</td>${stCol}<td><button class="sb" style="font-size:.68rem;padding:4px 8px" onclick="openEdit('${emp.id}','${dk}')">✏️</button> <button class="sb danger" style="font-size:.68rem;padding:4px 8px" onclick="deleteEntry('${emp.id}','${dk}')">🗑️</button></td></tr>`;
+  return`<tr><td>${ph}</td><td>${emp.name}</td><td><span class="badge ${sc}">${site}</span>${oz?` <span title="Hors zone">⚠️</span>`:''}</td><td>${st(sEv)}</td>${pCol}<td>${st(eEv)}</td>${gCol}<td style="font-family:var(--font-mono)">${totStr}</td>${stCol}<td>${tamperBadge} <button class="sb" style="font-size:.68rem;padding:4px 8px" onclick="openEdit('${emp.id}','${dk}')">✏️</button> <button class="sb danger" style="font-size:.68rem;padding:4px 8px" onclick="deleteEntry('${emp.id}','${dk}')">🗑️</button></td></tr>`;
 }
 
 function calcTot(evs){
