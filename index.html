@@ -1064,7 +1064,7 @@ async function syncNow(){
     }
     S_('pendingSync',[]);
     refreshMgr();
-    if(fail===0) showToast(`Synchronisation complète ✓ (${ok} pointage${ok>1?'s':''})','success');
+    if(fail===0) showToast(`Synchronisation complète ✓ (${ok} pointage${ok>1?'s':''})` ,'success');
     else showToast(`Sync partielle : ${ok} ok, ${fail} erreur(s)`,'error');
   }catch(e){
     console.error('Sync failed',e);
