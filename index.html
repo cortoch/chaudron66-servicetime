@@ -864,11 +864,22 @@ function buildRow(emp,rec,dk,showP){
   const sc=site==='Bages'?'bb':site==='Cabestany'?'bc':'';
   const oz=sEv?.outOfZone?'⚠️':'';
   const ph=sEv?.photo?`<img class="photo-thumb" src="${sEv.photo}" onclick="viewPh('${emp.id}','${dk}')">`:'<div style="width:32px;height:32px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:.8rem">👤</div>';
-  const pCol=showP?`<td style="font-size:.7rem;color:var(--text3)">${evs.filter(e=>e.type==='pause_start').length||'—'}</td>`:'';
+  // Calculer le détail des pauses multiples
+  const pauseCount=evs.filter(e=>e.type==='pause_start').length;
+  let pauseTotalMin=0;
+  let ps_=null;
+  evs.forEach(ev=>{
+    if(ev.type==='pause_start') ps_=timeToMin2(ev.correctedTime||ev.time);
+    if(ev.type==='pause_end'&&ps_!==null){pauseTotalMin+=timeToMin2(ev.correctedTime||ev.time)-ps_;ps_=null;}
+  });
+  const pauseStr=pauseCount===0?'—':`${pauseCount}×${pauseTotalMin>0?' ('+Math.floor(pauseTotalMin/60)+'h'+String(pauseTotalMin%60).padStart(2,'0')+')':''}`;
+  const pCol=showP?`<td style="font-size:.7rem;color:var(--text3)">${pauseStr}</td>`:'';
   const gCol=!showP?`<td style="font-size:.7rem">${oz||(sEv?.gps?'✓':'—')}</td>`:'';
   const stCol=showP?`<td>${stat}</td>`:'';
   return`<tr><td>${ph}</td><td>${emp.name}</td><td><span class="badge ${sc}">${site}</span>${oz?` <span title="Hors zone">⚠️</span>`:''}</td><td>${st(sEv)}</td>${pCol}<td>${st(eEv)}</td>${gCol}<td style="font-family:var(--font-mono)">${totStr}</td>${stCol}<td>${tamperBadge} <button class="sb" style="font-size:.68rem;padding:4px 8px" onclick="openEdit('${emp.id}','${dk}')">✏️</button> <button class="sb danger" style="font-size:.68rem;padding:4px 8px" onclick="deleteEntry('${emp.id}','${dk}')">🗑️</button></td></tr>`;
 }
+
+function timeToMin2(t){if(!t)return 0;const[h,m]=(t||'0:0').split(':').map(Number);return h*60+m}
 
 function calcTot(evs){
   let tot=0,sTs=null,pTs=null;
@@ -926,28 +937,32 @@ function saveEdit(){
   const recs=getRecs(); let rec=recs.find(r=>r.empId===empId&&r.date===dk);
   if(!rec){rec=newRec(empId,'?');recs.push(rec)}
 
-  // ── VALIDATION CHRONOLOGIQUE ──────────────────────────
+  // ── VALIDATION CHRONOLOGIQUE (pauses multiples) ───────
   const evs=rec.events;
   const sEv=evs.find(e=>e.type==='start');
-  const pauseStartEv=evs.find(e=>e.type==='pause_start');
-  const pauseEndEv=evs.find(e=>e.type==='pause_end');
+  // Toutes les pauses (peut y en avoir plusieurs)
+  const allPauseStarts=evs.filter(e=>e.type==='pause_start');
+  const allPauseEnds=evs.filter(e=>e.type==='pause_end');
+  const firstPauseStart=allPauseStarts[0];
+  const lastPauseEnd=allPauseEnds[allPauseEnds.length-1];
+  const lastPauseStart=allPauseStarts[allPauseStarts.length-1];
 
-  // Heure début ne peut pas être après une pause ou une fin
-  if(ns && pauseStartEv){
-    const ps=pauseStartEv.correctedTime||pauseStartEv.time;
-    if(ns>=ps){showToast(`Début (${ns}) doit être avant la pause (${ps})`,'error');return;}
+  // Heure début ne peut pas être après la première pause
+  if(ns && firstPauseStart){
+    const ps=firstPauseStart.correctedTime||firstPauseStart.time;
+    if(ns>=ps){showToast(`Début (${ns}) doit être avant la 1ère pause (${ps})`,'error');return;}
   }
-  // Heure fin ne peut pas être avant le début ni avant une pause
+  // Heure fin ne peut pas être avant le début ni avant la dernière pause
   if(ne){
     const startRef=ns||(sEv?.correctedTime||sEv?.time);
     if(startRef && ne<=startRef){showToast(`Fin (${ne}) doit être après le début (${startRef})`,'error');return;}
-    if(pauseStartEv){
-      const ps=pauseStartEv.correctedTime||pauseStartEv.time;
-      if(ne<=ps){showToast(`Fin (${ne}) doit être après la pause (${ps})`,'error');return;}
+    if(lastPauseStart){
+      const ps=lastPauseStart.correctedTime||lastPauseStart.time;
+      if(ne<=ps){showToast(`Fin (${ne}) doit être après la dernière pause (${ps})`,'error');return;}
     }
-    if(pauseEndEv){
-      const pe=pauseEndEv.correctedTime||pauseEndEv.time;
-      if(ne<=pe){showToast(`Fin (${ne}) doit être après la fin de pause (${pe})`,'error');return;}
+    if(lastPauseEnd){
+      const pe=lastPauseEnd.correctedTime||lastPauseEnd.time;
+      if(ne<=pe){showToast(`Fin (${ne}) doit être après la fin de la dernière pause (${pe})`,'error');return;}
     }
   }
   // ─────────────────────────────────────────────────────
