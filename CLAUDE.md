@@ -62,6 +62,19 @@ created_at timestamptz
 - Bucket privé (non public)
 - Policy `allow-all` : SELECT + INSERT pour le rôle `public`
 - Les photos sont accessibles via URL signée (1h) générée à la demande
+- **Suppression automatique après 31 jours** (via purge au démarrage)
+
+---
+
+## 🗑️ Politique de rétention des données
+
+| Donnée | iPhone (local) | Supabase |
+|---|---|---|
+| Pointages (heures, pauses) | Purgés après 31 jours | **Conservés indéfiniment** |
+| Photos | Purgées après 31 jours | **Supprimées après 31 jours** |
+| Employés | Toujours présents | Synchronisés à la demande |
+
+La purge est exécutée automatiquement à chaque démarrage de l'app.
 
 ---
 
@@ -74,10 +87,16 @@ created_at timestamptz
 - [x] Timeout GPS de 5 secondes — si pas de fix, pointage autorisé quand même
 - [x] Alerte visuelle si hors zone GPS (signalé au manager mais non bloquant)
 - [x] Prise de photo obligatoire à chaque pointage
-- [x] Photo avec watermark horodaté (nom, site, GPS, date/heure)
+- [x] Photo avec watermark lisible et proportionnel à la résolution :
+  - Trait doré en haut du bandeau
+  - Site en orange gras (18px scalé)
+  - Date + heure en blanc gras (20px scalé) — très visible
+  - Nom de l'employé (17px scalé)
+  - Coordonnées GPS en monospace (14px scalé)
+- [x] Compression JPEG à 75% (bon compromis qualité/taille)
 - [x] Timeline des événements du jour par employé
 - [x] Actions : Début de service, Pause, Reprise, Fin de service
-- [x] **Pauses multiples** — un employé peut faire plusieurs pauses dans la journée
+- [x] Pauses multiples — un employé peut faire plusieurs pauses dans la journée
 - [x] Horloge temps réel en haut de page
 
 ### Manager
@@ -88,7 +107,7 @@ created_at timestamptz
   - Fin ne peut pas être avant le début
   - Début ne peut pas être après la première pause existante
   - Fin ne peut pas être avant la dernière pause existante
-  - Gère correctement les **pauses multiples**
+  - Gère correctement les pauses multiples
   - Message d'erreur précis avec les heures en conflit
 - [x] Suppression complète d'une entrée (avec confirmation)
 - [x] Colonne Pauses affiche le nombre ET la durée totale cumulée (`2× (0h45)`)
@@ -100,7 +119,10 @@ created_at timestamptz
 - [x] Synchronisation des pointages vers Supabase (auto à chaque pointage + manuelle)
 - [x] Synchronisation des employés vers Supabase (manuelle)
 - [x] Chargement des données Supabase au démarrage de l'app (sync bidirectionnelle)
-- [x] Purge automatique des données locales > 31 jours
+- [x] Purge automatique au démarrage :
+  - Photos Supabase supprimées après 31 jours
+  - Pointages Supabase conservés indéfiniment
+  - Données locales iPhone purgées après 31 jours
 
 ### Sécurité & conformité
 - [x] Détection de manipulation d'horloge (comparaison heure locale vs serveur Supabase)
@@ -179,3 +201,4 @@ chaudron66-servicetime/
 - GPS : timeout renforcé pour éviter les blocages sur Safari iOS en `file://`
 - Pauses multiples : validation chronologique dans `saveEdit` ne prenait que la première pause
 - Pauses multiples : colonne "Pauses" n'affichait que le nombre, pas la durée totale
+- Purge : suppression des pointages Supabase retirée (historique conservé indéfiniment)
