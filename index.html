@@ -696,7 +696,7 @@ function demoPic(){
   ctx.fillStyle='#1a1a1a'; ctx.fillRect(0,0,640,480);
   ctx.fillStyle='#2d2d2d'; ctx.beginPath(); ctx.arc(320,175,85,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='#222'; ctx.beginPath(); ctx.ellipse(320,375,125,95,0,0,Math.PI*2); ctx.fill();
-  watermark(cv); S.capturedPhoto=cv.toDataURL('image/jpeg',.85);
+  watermark(cv); S.capturedPhoto=cv.toDataURL('image/jpeg',.75);
   stopCam(); showConfirm();
 }
 
@@ -704,23 +704,45 @@ function capturePhoto(){
   const v=document.getElementById('camera-video'), cv=document.getElementById('camera-canvas');
   cv.width=v.videoWidth||640; cv.height=v.videoHeight||480;
   cv.getContext('2d').drawImage(v,0,0,cv.width,cv.height);
-  watermark(cv); S.capturedPhoto=cv.toDataURL('image/jpeg',.85);
+  watermark(cv); S.capturedPhoto=cv.toDataURL('image/jpeg',.75);
   stopCam(); showConfirm();
 }
 
 function watermark(cv){
   const ctx=cv.getContext('2d'), now=new Date();
-  const date=now.toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});
-  const time=now.toLocaleTimeString('fr-FR');
+  // Adapter la taille du texte à la résolution de l'image
+  const scale=Math.max(1, cv.width/640);
+  const date=now.toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+  const time=now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   const site=S.detectedSite?`📍 ${S.detectedSite}`:'⚠️ Hors zone';
-  const gps=S.gpsCoords?`GPS: ${S.gpsCoords.lat.toFixed(5)}, ${S.gpsCoords.lng.toFixed(5)}  ±${Math.round(S.gpsCoords.accuracy)}m`:'GPS non disponible';
-  const lines=[`🔥 Le Chaudron 66 — ${site}`,`${date}  ${time}`,S.currentEmp?.name||'',gps].filter(Boolean);
-  const lh=19, pad=12, boxH=lines.length*lh+pad*2;
-  ctx.fillStyle='rgba(0,0,0,.72)'; ctx.fillRect(0,cv.height-boxH,cv.width,boxH);
+  const gps=S.gpsCoords
+    ?`GPS : ${S.gpsCoords.lat.toFixed(5)}, ${S.gpsCoords.lng.toFixed(5)}  ±${Math.round(S.gpsCoords.accuracy)} m`
+    :'GPS non disponible';
+  const lines=[
+    {text:`Le Chaudron 66 — ${site}`, size: 18*scale, bold:true,  color:'#c8913a'},
+    {text:`${date}  •  ${time}`,       size: 20*scale, bold:true,  color:'rgba(255,255,255,.95)'},
+    {text:S.currentEmp?.name||'',      size: 17*scale, bold:false, color:'rgba(255,255,255,.85)'},
+    {text:gps,                          size: 14*scale, bold:false, color:'rgba(255,255,255,.6)', mono:true},
+  ].filter(l=>l.text);
+  const pad=14*scale;
+  const lh=lines.map(l=>l.size*1.5);
+  const boxH=lh.reduce((a,b)=>a+b,0)+pad*2;
+  // Fond semi-transparent avec dégradé
+  const grad=ctx.createLinearGradient(0,cv.height-boxH,0,cv.height);
+  grad.addColorStop(0,'rgba(0,0,0,.75)');
+  grad.addColorStop(1,'rgba(0,0,0,.92)');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,cv.height-boxH,cv.width,boxH);
+  // Trait doré en haut du bandeau
+  ctx.fillStyle='#c8913a';
+  ctx.fillRect(0,cv.height-boxH,cv.width,2*scale);
+  // Textes
+  let y=cv.height-boxH+pad;
   lines.forEach((l,i)=>{
-    ctx.font=i===0?'bold 13px sans-serif':i===3?'10px monospace':'12px sans-serif';
-    ctx.fillStyle=i===0?'#c8913a':i===3?'rgba(255,255,255,.45)':'rgba(255,255,255,.88)';
-    ctx.fillText(l,pad,cv.height-boxH+pad+i*lh+3);
+    ctx.font=`${l.bold?'bold ':''} ${l.size}px ${l.mono?'monospace':'sans-serif'}`;
+    ctx.fillStyle=l.color;
+    ctx.fillText(l.text, pad, y+l.size);
+    y+=lh[i];
   });
 }
 
@@ -1145,8 +1167,28 @@ function changeMgrPin(){
 }
 function saveNP(){if(npBuf.length!==4)return;S_('managerPin',hp(npBuf));closeM('m-pin');showToast('Code manager modifié ✓','success')}
 
-function purge(){
+async function purge(){
   const c=new Date(); c.setDate(c.getDate()-31); const k=c.toISOString().slice(0,10);
+  const toDelete=getRecs().filter(r=>r.date<k);
+  // Supprimer les photos Supabase des anciens pointages
+  if(S.isOnline && toDelete.length){
+    const photoRefs=toDelete
+      .flatMap(r=>r.events||[])
+      .map(e=>e.photoRef)
+      .filter(Boolean);
+    if(photoRefs.length){
+      try{
+        await fetch(`${SUPA_URL}/storage/v1/object/photos`,{
+          method:'DELETE',
+          headers:{'Authorization':`Bearer ${SUPA_KEY}`,'apikey':SUPA_KEY,'Content-Type':'application/json'},
+          body:JSON.stringify({prefixes:photoRefs})
+        });
+        console.log(`🗑️ ${photoRefs.length} photo(s) Supabase supprimée(s) (> 31 jours)`);
+      }catch(e){ console.warn('Purge photos Supabase échouée',e); }
+    }
+  }
+  // Les pointages Supabase sont conservés indéfiniment (historique complet)
+  // Purge locale
   S_('records',getRecs().filter(r=>r.date>=k));
 }
 
