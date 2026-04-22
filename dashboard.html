@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tableau de bord | Le Chaudron 66</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#050c18;--surface:#0a1628;--surface2:#11203a;--surface3:#1a2d4d;
+    --border:rgba(64,91,130,0.35);--border2:rgba(107,133,173,0.4);
+    --accent:#D97757;--accent2:#e8906e;
+    --danger:oklch(0.68 0.20 28);--success:oklch(0.80 0.13 195);--warning:oklch(0.82 0.15 75);
+    --text:#eef3fb;--text2:#a8b9d4;--text3:#6b85ad;
+    --font-display:'Space Grotesk',-apple-system,system-ui,sans-serif;
+    --font-mono:'Geist Mono',ui-monospace,monospace;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font-display);background:var(--bg);color:var(--text);min-height:100vh}
+  .topbar{background:rgba(5,12,24,.96);border-bottom:1px solid var(--border);padding:0 24px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+  .topbar-title{font-family:var(--font-display);font-size:1rem;font-weight:600;letter-spacing:-0.02em;color:var(--text)}
+  .topbar-sub{font-family:var(--font-mono);font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-top:2px}
+  .topbar-right{display:flex;align-items:center;gap:12px}
+  .online-dot{width:8px;height:8px;border-radius:8px;background:var(--success);box-shadow:0 0 8px var(--success)}
+  .main{max-width:900px;margin:0 auto;padding:24px 16px}
+  /* STATS */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;transition:border-color .2s}
+  .stat-val{font-family:var(--font-mono);font-size:1.8rem;font-weight:600;letter-spacing:-0.03em;color:var(--text);margin-bottom:4px}
+  .stat-val span{font-size:1rem;color:var(--accent)}
+  .stat-lbl{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)}
+  /* FILTERS */
+  .filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+  .fi{padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.82rem;font-family:var(--font-display)}
+  .fi:focus{outline:none;border-color:var(--accent)}
+  .btn{padding:8px 16px;border-radius:10px;border:none;font-size:.82rem;font-family:var(--font-display);font-weight:500;cursor:pointer;transition:all .2s}
+  .btn-pri{background:var(--accent);color:#fff;font-weight:600}
+  .btn-pri:hover{background:var(--accent2)}
+  .btn-sec{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
+  .btn-sec:hover{background:var(--surface2)}
+  /* TABLE */
+  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+  table{width:100%;border-collapse:collapse}
+  thead{background:var(--surface2);border-bottom:2px solid var(--border)}
+  th{padding:10px 12px;text-align:left;font-family:var(--font-mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:10px 12px;font-size:.8rem;border-bottom:1px solid rgba(26,45,77,.5);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:rgba(255,255,255,.012)}
+  .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;font-size:.66rem;font-weight:600}
+  .bw{background:oklch(0.80 0.13 195 / 0.12);color:oklch(0.80 0.13 195)}
+  .bp{background:oklch(0.82 0.15 75 / 0.12);color:oklch(0.82 0.15 75)}
+  .bo{background:rgba(107,133,173,.12);color:var(--text3)}
+  .bb{background:rgba(217,119,87,.12);color:var(--accent)}
+  .bc{background:oklch(0.80 0.13 195 / 0.12);color:oklch(0.78 0.09 280)}
+  .corr{color:var(--warning);font-style:italic;font-size:.75rem}
+  .mono{font-family:'Courier New',monospace}
+  /* PHOTO */
+  .photo-thumb{width:30px;height:30px;border-radius:8px;object-fit:cover;border:2px solid var(--border);cursor:pointer;transition:border-color .2s}
+  .photo-thumb:hover{border-color:var(--accent)}
+  /* MODAL */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:24px;z-index:200;opacity:0;pointer-events:none;transition:opacity .3s}
+  .modal-overlay.open{opacity:1;pointer-events:all}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:400px;text-align:center}
+  .modal img{max-width:100%;border-radius:12px;margin-bottom:12px}
+  .modal-info{font-family:'Courier New',monospace;font-size:.7rem;color:var(--text3);line-height:1.9;margin-bottom:16px}
+  /* EMPTY */
+  .empty{text-align:center;padding:40px;color:var(--text3);font-size:.85rem}
+  /* LOADING */
+  .loading{text-align:center;padding:40px;color:var(--text2)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:8px;animation:spin .8s linear infinite;margin:0 auto 12px}
+  /* RESPONSIVE */
+  @media(max-width:600px){
+    th:nth-child(5),td:nth-child(5),th:nth-child(7),td:nth-child(7){display:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:14px">
+    <svg width="28" height="28" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="display:block;flex-shrink:0">
+      <rect x="1" y="1" width="62" height="62" rx="14" fill="#11203a" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <path d="M18 16 L32 34" stroke="#eef3fb" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+      <path d="M46 16 L32 34" stroke="#eef3fb" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+      <path d="M32 34 L32 48" stroke="#eef3fb" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+      <circle cx="32" cy="34" r="7" fill="none" stroke="#D97757" stroke-width="1.5" opacity="0.5"/>
+      <circle cx="32" cy="34" r="3.5" fill="#D97757"/>
+    </svg>
+    <span style="font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:-0.03em;color:#eef3fb;margin-right:4px">ylelor</span>
+    <div>
+      <div class="topbar-title">Tableau de bord</div>
+      <div class="topbar-sub">Le Chaudron 66 — Accès manager</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="online-dot" id="online-dot"></div>
+    <button class="btn btn-pri" onclick="loadData()">↺ Actualiser</button>
+  </div>
+</div>
+
+<div class="main">
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-val" id="s-present">—</div><div class="stat-lbl">Présents aujourd'hui</div></div>
+    <div class="stat-card"><div class="stat-val" id="s-bages">—</div><div class="stat-lbl">Sur Bages</div></div>
+    <div class="stat-card"><div class="stat-val" id="s-cabestany">—</div><div class="stat-lbl">Sur Cabestany</div></div>
+    <div class="stat-card"><div class="stat-val" id="s-month">—</div><div class="stat-lbl">Pointages ce mois</div></div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filters">
+    <input type="date" class="fi" id="f-date" onchange="loadData()">
+    <select class="fi" id="f-site" onchange="loadData()">
+      <option value="">Tous les sites</option>
+      <option value="Bages">Bages</option>
+      <option value="Cabestany">Cabestany</option>
+    </select>
+    <button class="btn btn-sec" onclick="exportCSV()">↓ Export CSV</button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>📷</th>
+          <th>Employé</th>
+          <th>Site</th>
+          <th>Début</th>
+          <th>Pauses</th>
+          <th>Fin</th>
+          <th>Total</th>
+          <th>Statut</th>
+          <th>Hors zone</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="9"><div class="loading"><div class="spinner"></div>Chargement…</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL PHOTO -->
+<div class="modal-overlay" id="m-photo" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <img id="pv-img" src="" alt="">
+    <div class="modal-info" id="pv-info"></div>
+    <button class="btn btn-sec" style="width:100%" onclick="document.getElementById('m-photo').classList.remove('open')">Fermer</button>
+  </div>
+</div>
+
+<script>
+const SUPA_URL='https://sxgxslkhzulivdbtwmuy.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4Z3hzbGtoenVsaXZkYnR3bXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMjkzOTIsImV4cCI6MjA4OTYwNTM5Mn0.YhMpHRGSx5JSlNb3Jouf4CBzbQ_2AUxQALzFzA8iUVs';
+
+const headers={'Authorization':`Bearer ${SUPA_KEY}`,'apikey':SUPA_KEY,'Content-Type':'application/json'};
+
+function todayStr(){return new Date().toISOString().slice(0,10)}
+function timeToMin(t){if(!t)return 0;const[h,m]=(t||'0:0').split(':').map(Number);return h*60+m}
+
+function calcTot(evs){
+  let tot=0,sTs=null,pTs=null;
+  (evs||[]).forEach(ev=>{
+    const t=ev.corrected&&ev.correctedTime?timeToMin(ev.correctedTime):timeToMin(ev.time);
+    if(ev.type==='start') sTs=t;
+    if(ev.type==='pause_start') pTs=t;
+    if(ev.type==='pause_end'&&pTs!=null){tot+=t-pTs;pTs=null}
+    if(ev.type==='end'&&sTs!=null){tot+=(t-sTs)-Object.keys({}).length}
+  });
+  // recalcul propre
+  let w=0,s=null,p=null;
+  (evs||[]).forEach(ev=>{
+    const t=timeToMin(ev.corrected&&ev.correctedTime?ev.correctedTime:ev.time);
+    if(ev.type==='start') s=t;
+    if(ev.type==='pause_start') p=t;
+    if(ev.type==='pause_end'&&p!=null){w+=t-p;p=null}
+    if(ev.type==='end'&&s!=null) w+=(t-s)-calcPauses(evs);
+  });
+  return Math.max(0,calcWorked(evs));
+}
+
+function calcWorked(evs){
+  if(!evs||!evs.length) return 0;
+  const s=evs.find(e=>e.type==='start'), en=evs.find(e=>e.type==='end');
+  if(!s) return 0;
+  const st=timeToMin(s.correctedTime||s.time);
+  const et=en?timeToMin(en.correctedTime||en.time):timeToMin(new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}));
+  let pauses=0,ps=null;
+  evs.forEach(ev=>{
+    if(ev.type==='pause_start') ps=timeToMin(ev.correctedTime||ev.time);
+    if(ev.type==='pause_end'&&ps!=null){pauses+=timeToMin(ev.correctedTime||ev.time)-ps;ps=null}
+  });
+  return Math.max(0,et-st-pauses);
+}
+
+function fmtTot(min){return min>0?`${Math.floor(min/60)}h${String(min%60).padStart(2,'0')}`:'—'}
+
+async function loadData(){
+  const date=document.getElementById('f-date').value||todayStr();
+  const site=document.getElementById('f-site').value;
+  const tbody=document.getElementById('tbody');
+  tbody.innerHTML='<tr><td colspan="9"><div class="loading"><div class="spinner"></div>Chargement…</div></td></tr>';
+
+  try{
+    // Charger employés
+    const re=await fetch(`${SUPA_URL}/rest/v1/employees?select=*`,{headers});
+    const emps=re.ok?await re.json():[];
+
+    // Charger pointages du jour sélectionné
+    let url=`${SUPA_URL}/rest/v1/records?date=eq.${date}&select=*`;
+    if(site) url+=`&site=eq.${site}`;
+    const rr=await fetch(url,{headers});
+    const recs=rr.ok?await rr.json():[];
+
+    // Stats
+    const todayRecs=recs.filter(r=>r.date===date);
+    document.getElementById('s-present').innerHTML=`${todayRecs.filter(r=>r.events?.some(e=>e.type==='start')).length}<span> / ${emps.length}</span>`;
+    document.getElementById('s-bages').textContent=todayRecs.filter(r=>r.site==='Bages').length;
+    document.getElementById('s-cabestany').textContent=todayRecs.filter(r=>r.site==='Cabestany').length;
+
+    // Pointages du mois
+    const month=new Date().toISOString().slice(0,7);
+    const rm=await fetch(`${SUPA_URL}/rest/v1/records?date=gte.${month}-01&select=id`,{headers});
+    const mRecs=rm.ok?await rm.json():[];
+    document.getElementById('s-month').textContent=mRecs.length;
+
+    // Construire tableau
+    if(!emps.length&&!recs.length){
+      tbody.innerHTML='<tr><td colspan="9"><div class="empty">Aucune donnée — synchronisez l\'app d\'abord</div></td></tr>';
+      return;
+    }
+
+    const rows=emps.map(emp=>{
+      const rec=recs.find(r=>r.emp_id===emp.id);
+      const evs=rec?.events||[];
+      const sEv=evs.find(e=>e.type==='start'), eEv=evs.find(e=>e.type==='end');
+      const pauses=evs.filter(e=>e.type==='pause_start').length;
+      const tot=calcWorked(evs);
+      const outOfZone=evs.some(e=>e.outOfZone);
+      const hasCorr=evs.some(e=>e.corrected);
+      const inPause=evs[evs.length-1]?.type==='pause_start';
+
+      let statBadge='<span class="badge bo">Absent</span>';
+      if(sEv&&eEv) statBadge='<span class="badge bw">✓ Terminé</span>';
+      else if(inPause) statBadge='<span class="badge bp">☕ Pause</span>';
+      else if(sEv) statBadge='<span class="badge bw">● En service</span>';
+
+      const siteBadge=rec?.site==='Bages'?'<span class="badge bb">Bages</span>':rec?.site==='Cabestany'?'<span class="badge bc">Cabestany</span>':'<span class="badge bo">—</span>';
+
+      const st=ev=>ev?(ev.corrected?`<span class="corr">${ev.correctedTime||ev.time}</span>`:ev.time):'—';
+
+      const photoCell=sEv?.photoRef
+        ?`<img class="photo-thumb" src="" data-ref="${sEv.photoRef}" data-emp="${emp.name}" data-date="${date}" data-time="${sEv.time}" onclick="viewPhoto(this)">`
+        :(sEv?.photo?`<img class="photo-thumb" src="${sEv.photo}">`:'—');
+
+      return`<tr>
+        <td>${photoCell}</td>
+        <td><strong>${emp.name}</strong>${hasCorr?' <span style="color:var(--warning);font-size:.65rem">✏️</span>':''}</td>
+        <td>${siteBadge}</td>
+        <td class="mono">${st(sEv)}</td>
+        <td>${pauses?`${pauses} pause${pauses>1?'s':''}`:'—'}</td>
+        <td class="mono">${st(eEv)}</td>
+        <td class="mono">${fmtTot(tot)}</td>
+        <td>${statBadge}</td>
+        <td>${outOfZone?'<span style="color:var(--danger)">⚠️ Oui</span>':'—'}</td>
+      </tr>`;
+    }).join('');
+
+    tbody.innerHTML=rows||'<tr><td colspan="9"><div class="empty">Aucun pointage ce jour</div></td></tr>';
+
+    // Charger les photos en lazy
+    document.querySelectorAll('img[data-ref]').forEach(img=>{
+      // On charge à la demande au clic — pas en lazy pour économiser les URLs signées
+    });
+
+  }catch(e){
+    console.error(e);
+    tbody.innerHTML=`<tr><td colspan="9"><div class="empty">Erreur de chargement : ${e.message}</div></td></tr>`;
+  }
+}
+
+async function viewPhoto(img){
+  const ref=img.dataset.ref;
+  if(!ref) return;
+  const overlay=document.getElementById('m-photo');
+  const pvImg=document.getElementById('pv-img');
+  pvImg.src='';
+  document.getElementById('pv-info').textContent='Chargement…';
+  overlay.classList.add('open');
+  try{
+    const resp=await fetch(`${SUPA_URL}/storage/v1/object/sign/photos/${ref}`,{
+      method:'POST',headers,body:JSON.stringify({expiresIn:3600})
+    });
+    const data=await resp.json();
+    pvImg.src=`${SUPA_URL}/storage/v1${data.signedURL}`;
+    document.getElementById('pv-info').innerHTML=`${img.dataset.emp} — ${img.dataset.date}<br>🕐 ${img.dataset.time}`;
+  }catch(e){
+    document.getElementById('pv-info').textContent='Photo non disponible';
+  }
+}
+
+function exportCSV(){
+  const rows=[];
+  const ths=[...document.querySelectorAll('th')].map(t=>t.textContent.trim()).filter(Boolean);
+  rows.push(ths.join(';'));
+  document.querySelectorAll('tbody tr').forEach(tr=>{
+    const cells=[...tr.querySelectorAll('td')].map(td=>td.textContent.trim());
+    if(cells.length) rows.push(cells.join(';'));
+  });
+  const blob=new Blob(['\uFEFF'+rows.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`chaudron66_${document.getElementById('f-date').value||'aujourd-hui'}.csv`;
+  a.click();
+}
+
+// Init
+document.getElementById('f-date').value=todayStr();
+document.getElementById('online-dot').style.background=navigator.onLine?'oklch(0.80 0.13 195)':'oklch(0.68 0.20 28)';
+loadData();
+setInterval(loadData, 60000); // Actualisation auto toutes les minutes
+</script>
+</body>
+</html>

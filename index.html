@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ylelor">
+<title>ylelor — Le Chaudron 66</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#050c18; --surface:#0a1628; --surface2:#11203a; --surface3:#1a2d4d;
+    --border:rgba(64,91,130,0.35); --border2:rgba(107,133,173,0.4);
+    --accent:#D97757; --accent2:#e8906e;
+    --danger:oklch(0.68 0.20 28); --success:oklch(0.80 0.13 195); --warning:oklch(0.82 0.15 75);
+    --text:#eef3fb; --text2:#a8b9d4; --text3:#6b85ad;
+    --font-display:'Space Grotesk',-apple-system,system-ui,sans-serif;
+    --font-mono:'Geist Mono',ui-monospace,monospace;
+    --font-body:'Space Grotesk',-apple-system,system-ui,sans-serif;
+    --radius:14px; --tr:cubic-bezier(.4,0,.2,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:var(--font-display);background:var(--bg);color:var(--text);position:fixed;width:100%;height:100%;overflow:hidden}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .4s var(--tr),transform .4s var(--tr);transform:translateY(20px);overflow-y:auto}
+  .screen.active{opacity:1;pointer-events:all;transform:translateY(0)}
+  .topbar{position:fixed;top:0;left:0;right:0;height:64px;background:rgba(5,12,24,.96);backdrop-filter:blur(12px);display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 20px;border-bottom:1px solid var(--border);z-index:100}
+  .topbar-logo{display:flex;align-items:center;gap:9px}
+  .topbar-logo-text{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:-0.03em;color:var(--text)}
+  .topbar-clock{font-family:var(--font-mono);font-size:1.35rem;font-weight:500;color:var(--text);text-align:center;letter-spacing:-0.03em}
+  .topbar-right{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+  .online-dot{width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 8px var(--success);transition:all .3s}
+  .online-dot.offline{background:var(--danger);box-shadow:0 0 8px var(--danger)}
+  /* LOCK */
+  #screen-lock{background:radial-gradient(ellipse at 50% 0%,#0a1628 0%,#050c18 65%);padding-top:72px;justify-content:flex-start;padding-bottom:10px}
+  .lock-headline{text-align:center;margin-bottom:16px;margin-top:8px}
+  .lock-date{font-family:var(--font-mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+  .lock-time{font-family:var(--font-mono);font-size:clamp(2.6rem,9vw,3.6rem);font-weight:500;letter-spacing:-0.04em;color:var(--text);line-height:1}
+  .lock-prompt{font-size:15px;color:var(--text2);letter-spacing:-0.01em;text-align:center;margin-bottom:18px}
+  /* GPS CARD */
+  .gps-card{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;gap:12px;margin-bottom:14px;transition:border-color .5s}
+  .gps-card.locating{border-color:rgba(107,133,173,0.4)}
+  .gps-card.bages{border-color:rgba(217,119,87,.4);background:rgba(217,119,87,.04)}
+  .gps-card.cabestany{border-color:oklch(0.80 0.13 195 / 0.3);background:oklch(0.80 0.13 195 / 0.04)}
+  .gps-card.unknown{border-color:rgba(224,82,82,.3);background:rgba(224,82,82,.03)}
+  .gps-icon{font-size:1.1rem;flex-shrink:0}
+  .gps-site-name{font-size:.88rem;font-weight:600;color:var(--text)}
+  .gps-meta{font-family:var(--font-mono);font-size:.62rem;color:var(--text3);margin-top:2px}
+  @keyframes blink{0%,100%{opacity:.4}50%{opacity:1}}
+  .blink{animation:blink 1.2s infinite}
+  /* ZONE ALERT */
+  .zone-alert{width:100%;max-width:340px;background:rgba(224,82,82,.06);border:1px solid rgba(224,82,82,.25);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;text-align:center}
+  .zone-alert-title{color:var(--danger);font-weight:600;font-size:.85rem;margin-bottom:4px}
+  .zone-alert-body{color:var(--text2);font-size:.74rem;line-height:1.4;margin-bottom:8px}
+  .zone-alert-coords{font-family:var(--font-mono);font-size:.62rem;color:var(--text3)}
+  /* NUMPAD */
+  .numpad-display{display:flex;gap:18px;margin-bottom:20px}
+  .numpad-dot{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--surface3);background:transparent;transition:all .2s}
+  .numpad-dot.filled{background:var(--text);border-color:var(--text);box-shadow:0 0 0 4px color-mix(in oklch,var(--accent) 22%,transparent)}
+  .numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:268px;width:100%}
+  .num-btn{aspect-ratio:1;background:var(--surface2);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:var(--font-display);font-size:1.4rem;font-weight:500;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;user-select:none;-webkit-user-select:none}
+  .num-btn:active{transform:scale(.88);background:var(--surface3)}
+  .num-btn.accent{background:var(--accent);color:#fff;border-color:transparent;font-size:.82rem;font-weight:600}
+  .num-btn.accent:active{background:var(--accent2)}
+  .num-btn.del{background:transparent;border-color:transparent;color:var(--text3)}
+  /* EMPLOYEE */
+  #screen-employee{padding-top:80px}
+  .emp-greeting{font-family:var(--font-display);font-size:clamp(1.4rem,5vw,2rem);font-weight:600;color:var(--text);text-align:center;margin-bottom:4px;letter-spacing:-0.02em}
+  .emp-name{color:var(--accent)}
+  .site-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:100px;font-size:.72rem;font-weight:500;letter-spacing:.05em;margin-bottom:18px}
+  .site-pill.bages{background:rgba(217,119,87,.1);border:1px solid rgba(217,119,87,.3);color:var(--accent)}
+  .site-pill.cabestany{background:oklch(0.80 0.13 195 / 0.1);border:1px solid oklch(0.80 0.13 195 / 0.3);color:oklch(0.80 0.13 195)}
+  .site-pill.unknown{background:rgba(224,82,82,.08);border:1px solid rgba(224,82,82,.25);color:var(--danger)}
+  .status-card{width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:12px}
+  .status-label{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+  .timeline-item{display:flex;align-items:center;gap:11px;padding:7px 0;border-bottom:1px solid var(--border)}
+  .timeline-item:last-child{border-bottom:none}
+  .tl-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .tl-dot.start{background:var(--success)}.tl-dot.pause{background:var(--warning)}.tl-dot.end{background:var(--danger)}
+  .tl-time{font-family:var(--font-mono);font-size:.8rem;color:var(--text2);min-width:50px}
+  .tl-label{font-size:.8rem;color:var(--text)}
+  .tl-corr{font-size:.67rem;color:var(--warning);margin-left:auto;font-style:italic}
+  .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:420px;margin-bottom:14px}
+  .action-btn{padding:16px 12px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--font-display);font-size:.85rem;font-weight:500;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center}
+  .action-btn .bi{font-size:1.4rem}
+  .action-btn:active{transform:scale(.95)}
+  .action-btn.primary{background:var(--accent);border-color:transparent;color:#fff;grid-column:span 2;flex-direction:row;justify-content:center;font-size:.95rem;font-weight:600;padding:18px}
+  .action-btn.danger{background:rgba(224,82,82,.07);border-color:rgba(224,82,82,.3);color:var(--danger);grid-column:span 2}
+  .btn-sec{padding:13px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font-display);font-size:.9rem;font-weight:500;cursor:pointer;transition:all .2s}
+  .btn-pri{padding:13px;background:var(--accent);border:none;border-radius:var(--radius);color:#fff;font-family:var(--font-display);font-size:.9rem;font-weight:600;cursor:pointer;transition:all .2s}
+  .btn-sec:active{background:var(--surface2)}.btn-pri:active{background:var(--accent2)}
+  /* MANAGER */
+  #screen-manager{padding-top:80px;align-items:stretch}
+  .mgr-tabs{display:flex;gap:2px;background:var(--surface2);border-radius:12px;padding:3px;margin-bottom:16px;width:100%;max-width:600px;align-self:center}
+  .mgr-tab{flex:1;padding:8px 5px;border-radius:9px;border:none;background:transparent;color:var(--text3);font-family:var(--font-display);font-size:.73rem;font-weight:500;cursor:pointer;transition:all .2s;text-align:center}
+  .mgr-tab.active{background:var(--accent);color:#fff}
+  .mgr-content{width:100%;max-width:600px;align-self:center}
+  .scroll{width:100%;overflow-y:auto;max-height:calc(100vh - 150px);padding-bottom:20px}
+  table{width:100%;border-collapse:collapse}
+  thead{position:sticky;top:0;background:var(--surface);z-index:2}
+  th{padding:8px 9px;text-align:left;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);font-family:var(--font-mono)}
+  td{padding:8px 9px;font-size:.78rem;border-bottom:1px solid rgba(26,45,77,.5);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:rgba(255,255,255,.012)}
+  .badge{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:100px;font-size:.67rem;font-weight:500}
+  .bw{background:oklch(0.80 0.13 195 / 0.12);color:oklch(0.80 0.13 195)}
+  .bp{background:oklch(0.82 0.15 75 / 0.12);color:oklch(0.82 0.15 75)}
+  .bo{background:rgba(107,133,173,.12);color:var(--text3)}
+  .bb{background:rgba(217,119,87,.12);color:var(--accent)}
+  .bc{background:oklch(0.80 0.13 195 / 0.12);color:oklch(0.78 0.09 280)}
+  .corr{color:var(--warning);font-style:italic}
+  /* MODAL */
+  .modal-overlay{position:fixed;inset:0;background:rgba(5,12,24,.88);display:flex;align-items:center;justify-content:center;padding:24px;z-index:200;opacity:0;pointer-events:none;transition:opacity .3s}
+  .modal-overlay.open{opacity:1;pointer-events:all}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:370px;transform:scale(.9);transition:transform .3s var(--tr)}
+  .modal-overlay.open .modal{transform:scale(1)}
+  .modal-title{font-family:var(--font-display);font-size:1.1rem;font-weight:600;color:var(--text);margin-bottom:16px;letter-spacing:-0.01em}
+  .fg{margin-bottom:13px}
+  .fl{display:block;font-family:var(--font-mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:4px}
+  .fi{width:100%;padding:10px 13px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--font-mono);font-size:.88rem}
+  .fi:focus{outline:none;border-color:var(--accent)}
+  .mnote{font-size:.71rem;color:var(--warning);display:flex;align-items:center;gap:5px;padding:8px 12px;background:oklch(0.82 0.15 75 / 0.06);border:1px solid oklch(0.82 0.15 75 / 0.2);border-radius:8px;margin-bottom:16px}
+  .mbtns{display:flex;gap:9px}
+  /* SETTINGS */
+  .ss{margin-bottom:20px}
+  .st{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  .sr{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(26,45,77,.4)}
+  .sr:last-child{border-bottom:none}
+  .srl{font-size:.85rem;color:var(--text)}
+  .srs{font-size:.7rem;color:var(--text3);margin-top:2px}
+  .sb{padding:6px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font-display);font-size:.75rem;cursor:pointer;transition:all .2s}
+  .sb:active{opacity:.7}
+  .sb.danger{color:var(--danger);border-color:rgba(224,82,82,.3);background:rgba(224,82,82,.05)}
+  .add-form{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+  .photo-thumb{width:32px;height:32px;border-radius:8px;object-fit:cover;border:1px solid var(--border);cursor:pointer;transition:border-color .2s}
+  .photo-thumb:hover{border-color:var(--accent)}
+  .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:10px 20px;font-size:.8rem;color:var(--text);z-index:300;transition:transform .3s var(--tr);white-space:nowrap}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .toast.success{border-color:var(--success);color:var(--success)}
+  .toast.error{border-color:var(--danger);color:var(--danger)}
+  /* Manager mode — fond bleu marine distinct */
+  body.mgr-mode #screen-lock{background:radial-gradient(ellipse at 50% -10%,#1a2d4d 0%,#0a1628 65%)!important}
+  body.mgr-mode .lock-time{color:var(--text2)}
+  body.mgr-mode .lock-prompt{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3)}
+  body.mgr-mode .gps-card{display:none}
+  body.mgr-mode .zone-alert{display:none!important}
+  body.mgr-mode .numpad-dot.filled{box-shadow:0 0 0 4px color-mix(in oklch,var(--success) 22%,transparent)}
+  #screen-manager{background:linear-gradient(180deg,#0d1e35 0%,#050c18 100%)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">
+    <!-- Ylelor Y monogramme — signal variant -->
+    <svg width="28" height="28" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="display:block;flex-shrink:0">
+      <rect x="1" y="1" width="62" height="62" rx="14" fill="#11203a" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <path d="M18 16 L32 34" stroke="#eef3fb" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+      <path d="M46 16 L32 34" stroke="#eef3fb" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+      <path d="M32 34 L32 48" stroke="#eef3fb" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+      <circle cx="32" cy="34" r="7" fill="none" stroke="#D97757" stroke-width="1.5" opacity="0.5"/>
+      <circle cx="32" cy="34" r="3.5" fill="#D97757"/>
+    </svg>
+    <span class="topbar-logo-text">ylelor</span>
+  </div>
+  <div class="topbar-clock" id="topbar-clock">--:--:--</div>
+  <div class="topbar-right"><div class="online-dot" id="online-dot"></div></div>
+</div>
+
+<!-- LOCK -->
+<div class="screen active" id="screen-lock">
+  <div class="lock-headline">
+    <div class="lock-date" id="lock-date"></div>
+    <div class="lock-time" id="lock-time-big">--:--</div>
+  </div>
+  <div class="lock-prompt" id="lock-prompt">Entrez votre code</div>
+
+  <div class="gps-card locating" id="gps-card">
+    <div class="gps-icon" id="gps-icon">📡</div>
+    <div>
+      <div class="gps-site-name" id="gps-site-name"><span class="blink">Localisation GPS…</span></div>
+      <div class="gps-meta" id="gps-meta">Patientez quelques secondes</div>
+    </div>
+  </div>
+
+  <div class="zone-alert" id="zone-alert" style="display:none">
+    <div class="zone-alert-title">⚠️ Hors zone connue</div>
+    <div class="zone-alert-body">Vous n'êtes pas détecté sur un site du Chaudron.<br>Le pointage sera autorisé mais <strong>signalé au manager</strong>.</div>
+    <div class="zone-alert-coords" id="zone-coords"></div>
+  </div>
+
+  <div class="numpad-display" id="pin-display">
+    <div class="numpad-dot" id="d0"></div><div class="numpad-dot" id="d1"></div>
+    <div class="numpad-dot" id="d2"></div><div class="numpad-dot" id="d3"></div>
+  </div>
+  <div class="numpad" id="numpad-lock"></div>
+</div>
+
+<!-- EMPLOYEE -->
+<div class="screen" id="screen-employee">
+  <div class="emp-greeting">Bonjour, <span class="emp-name" id="emp-name-disp">—</span></div>
+  <div id="emp-site-badge"></div>
+  <div class="status-card">
+    <div class="status-label">Activité du jour</div>
+    <div id="emp-timeline"></div>
+  </div>
+  <div class="action-grid" id="emp-actions"></div>
+  <button class="btn-sec" style="width:100%;max-width:420px;margin-top:6px" onclick="logout()">← Retour</button>
+</div>
+
+<!-- Canvas caché pour capture silencieuse -->
+<canvas id="camera-canvas" style="display:none"></canvas>
+<video id="camera-video" style="display:none" autoplay playsinline muted></video>
+
+<!-- MANAGER -->
+<div class="screen" id="screen-manager">
+  <div id="mgr-dash" style="width:100%;max-width:600px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:7px">
+        <svg width="20" height="20" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="62" height="62" rx="14" fill="#11203a" stroke="rgba(255,255,255,0.08)"/>
+          <path d="M18 16 L32 34" stroke="#eef3fb" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+          <path d="M46 16 L32 34" stroke="#eef3fb" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+          <path d="M32 34 L32 48" stroke="#eef3fb" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+          <circle cx="32" cy="34" r="7" fill="none" stroke="#D97757" stroke-width="1.5" opacity="0.5"/>
+          <circle cx="32" cy="34" r="3.5" fill="#D97757"/>
+        </svg>
+        <span style="font-family:var(--font-display);font-size:1rem;font-weight:600;letter-spacing:-0.02em;color:var(--text)">ylelor</span>
+      </div>
+      <button class="btn-sec" style="padding:6px 12px;font-size:.75rem" onclick="mgrLogout()">Déconnexion</button>
+    </div>
+    <div class="mgr-tabs">
+      <button class="mgr-tab active" onclick="switchTab('t-today')">Aujourd'hui</button>
+      <button class="mgr-tab" onclick="switchTab('t-hist')">Historique</button>
+      <button class="mgr-tab" onclick="switchTab('t-emp')">Employés</button>
+      <button class="mgr-tab" onclick="switchTab('t-exp')">Export</button>
+    </div>
+    <div class="scroll">
+      <div id="t-today" class="mgr-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+          <div style="font-size:.76rem;color:var(--text3)" id="today-lbl"></div>
+          <div style="display:flex;gap:5px">
+            <button class="sb" onclick="flt('all')" id="f-all" style="font-size:.68rem;padding:4px 9px">Tous</button>
+            <button class="sb" onclick="flt('Bages')" id="f-bag" style="font-size:.68rem;padding:4px 9px">Bages</button>
+            <button class="sb" onclick="flt('Cabestany')" id="f-cab" style="font-size:.68rem;padding:4px 9px">Cabestany</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto"><table><thead><tr><th>📷</th><th>Employé</th><th>Site</th><th>Début</th><th>Pauses</th><th>Fin</th><th>Total</th><th>Statut</th><th></th></tr></thead><tbody id="today-tbody"></tbody></table></div>
+      </div>
+      <div id="t-hist" class="mgr-content" style="display:none">
+        <div class="fg" style="margin-bottom:12px"><label class="fl">Date</label><input type="date" class="fi" id="hist-dp" onchange="loadHist()"></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>📷</th><th>Employé</th><th>Site</th><th>Début</th><th>Fin</th><th>Total</th><th>GPS</th><th></th></tr></thead><tbody id="hist-tbody"></tbody></table></div>
+      </div>
+      <div id="t-emp" class="mgr-content" style="display:none">
+        <div class="add-form">
+          <div style="font-size:.8rem;font-weight:600;color:var(--accent);margin-bottom:11px">+ Nouvel employé</div>
+          <div class="fg"><label class="fl">Prénom Nom</label><input type="text" class="fi" id="ne-name" placeholder="Marie Martin"></div>
+          <div class="fg"><label class="fl">Code PIN (4 chiffres)</label><input type="text" class="fi" id="ne-pin" placeholder="••••" maxlength="4" inputmode="numeric"></div>
+          <button class="btn-pri" style="width:100%" onclick="addEmp()">Créer</button>
+        </div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Nom</th><th>PIN</th><th>Créé le</th><th></th></tr></thead><tbody id="emp-tbody"></tbody></table></div>
+      </div>
+      <div id="t-exp" class="mgr-content" style="display:none">
+        <div class="ss"><div class="st">Export</div>
+          <div class="sr"><div><div class="srl">Rapport du jour (CSV)</div></div><button class="sb" onclick="exportCSV('today')">↓ Export</button></div>
+          <div class="sr"><div><div class="srl">Rapport mensuel (CSV)</div><div class="srs" id="exp-month"></div></div><button class="sb" onclick="exportCSV('month')">↓ Export</button></div>
+        </div>
+        <div class="ss"><div class="st">Synchronisation</div>
+          <div id="sync-info" style="font-size:.8rem;color:var(--text2);padding:9px 0"></div>
+          <div class="sr"><div><div class="srl">Synchroniser maintenant</div></div><button class="sb" onclick="syncNow()">↑ Sync</button></div>
+        </div>
+        <div class="ss"><div class="st">Sécurité</div>
+          <div class="sr"><div><div class="srl">Changer code manager</div></div><button class="sb" onclick="changeMgrPin()">Modifier</button></div>
+          <div class="sr"><div><div class="srl">Purger données > 31 jours</div></div><button class="sb danger" onclick="purge()">Purger</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="m-edit">
+  <div class="modal">
+    <div class="modal-title">✏️ Corriger le pointage</div>
+    <div class="mnote">⚠️ Les corrections apparaissent en orange dans les exports.</div>
+    <input type="hidden" id="edit-key">
+    <div class="fg"><label class="fl">Heure d'arrivée</label><input type="time" class="fi" id="edit-start"></div>
+    <div class="fg"><label class="fl">Heure de départ</label><input type="time" class="fi" id="edit-end"></div>
+    <div class="fg"><label class="fl">Raison</label><input type="text" class="fi" id="edit-why" placeholder="Oubli, erreur…"></div>
+    <div class="mbtns"><button class="btn-sec" onclick="closeM('m-edit')">Annuler</button><button class="btn-pri" onclick="saveEdit()">Sauvegarder</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="m-photo">
+  <div class="modal" style="text-align:center">
+    <img id="pv-img" src="" alt="" style="max-width:100%;border-radius:12px;margin-bottom:10px">
+    <div id="pv-info" style="font-family:var(--font-mono);font-size:.7rem;color:var(--text3);line-height:1.9"></div>
+    <button class="btn-sec" style="width:100%;margin-top:13px" onclick="closeM('m-photo')">Fermer</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="m-pin">
+  <div class="modal" style="text-align:center">
+    <div class="modal-title" style="text-align:center">Nouveau code manager</div>
+    <div class="numpad-display" id="np-disp" style="justify-content:center;margin-bottom:18px">
+      <div class="numpad-dot" id="np0"></div><div class="numpad-dot" id="np1"></div>
+      <div class="numpad-dot" id="np2"></div><div class="numpad-dot" id="np3"></div>
+    </div>
+    <div class="numpad" id="numpad-np" style="margin:0 auto 14px"></div>
+    <button class="btn-sec" style="width:100%" onclick="closeM('m-pin')">Annuler</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  LE CHAUDRON 66 — POINTEUSE v3.1 — GPS AUTO
+// ══════════════════════════════════════════════════════
+
+// ── SITES (coordonnées exactes géocodées) ─────────────
+const SITES = {
+  Bages:     { lat:42.6040, lng:2.8983,  r:150, label:'Bages',     addr:'1 rue du Cinéma, 66670 Bages' },
+  Cabestany: { lat:42.6725, lng:2.9430,  r:150, label:'Cabestany', addr:'20 av. André Ampère, 66330 Cabestany' },
+};
+
+// ── STATE ─────────────────────────────────────────────
+let S = {
+  gpsStatus:'locating', detectedSite:null, gpsCoords:null,
+  currentEmp:null, currentAction:null, capturedPhoto:null,
+  isOnline:navigator.onLine, mgrLogged:false, mgrPinMode:false,
+};
+let lockBuf='', mgrBuf='', npBuf='';
+let camStream=null, gpsWatch=null, holdTimer=null;
+let activeTab='t-today', siteFlt='all';
+
+// ── STORAGE ───────────────────────────────────────────
+const G=(k,d=null)=>{try{return JSON.parse(localStorage.getItem('ch66_'+k))??d}catch{return d}};
+const S_=(k,v)=>{try{localStorage.setItem('ch66_'+k,JSON.stringify(v))}catch(e){}};
+const hp=p=>{let h=0;for(let i=0;i<p.length;i++)h=(Math.imul(31,h)+p.charCodeAt(i))|0;return String(h+2147483648)};
+
+function initStorage(){
+  if(!G('employees')) S_('employees',[
+    {id:'e1',name:'Marie Martin',pin:hp('1234'),createdAt:new Date().toISOString()},
+    {id:'e2',name:'Thomas Dupont',pin:hp('5678'),createdAt:new Date().toISOString()},
+  ]);
+  if(!G('managerPin')) S_('managerPin',hp('1966'));
+  if(!G('records')) S_('records',[]);
+  if(!G('pendingSync')) S_('pendingSync',[]);
+}
+
+const getEmps=()=>G('employees',[]);
+const getRecs=()=>G('records',[]);
+const todayKey=()=>new Date().toISOString().slice(0,10);
+const getEmpRec=(id,dk=null)=>getRecs().find(r=>r.empId===id&&r.date===(dk||todayKey()))||null;
+const newRec=(empId,site)=>({id:`${empId}_${todayKey()}`,empId,site,date:todayKey(),events:[],correctionLog:[]});
+
+function saveRec(rec){
+  const rs=getRecs(); const i=rs.findIndex(r=>r.id===rec.id);
+  if(i>=0) rs[i]=rec; else rs.push(rec); S_('records',rs);
+  const p=G('pendingSync',[]); p.push({type:'record',id:rec.id,ts:Date.now()}); S_('pendingSync',p);
+}
+
+// ── CLOCK ─────────────────────────────────────────────
+function tickClock(){
+  const now=new Date();
+  const el=document.getElementById('topbar-clock');
+  if(el) el.textContent=now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const big=document.getElementById('lock-time-big');
+  if(big) big.textContent=now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const ld=document.getElementById('lock-date');
+  if(ld) ld.textContent=now.toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'long'});
+}
+
+// ── ONLINE ────────────────────────────────────────────
+function updOnline(){
+  S.isOnline=navigator.onLine;
+  const dot=document.getElementById('online-dot');
+  if(dot) dot.classList.toggle('offline',!S.isOnline);
+}
+
+// ── SCREEN ────────────────────────────────────────────
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
+
+// ── GPS ───────────────────────────────────────────────
+function haversine(la1,lo1,la2,lo2){
+  const R=6371000,f1=la1*Math.PI/180,f2=la2*Math.PI/180,df=(la2-la1)*Math.PI/180,dl=(lo2-lo1)*Math.PI/180;
+  const a=Math.sin(df/2)**2+Math.cos(f1)*Math.cos(f2)*Math.sin(dl/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function detectSite(lat,lng){
+  for(const[n,s] of Object.entries(SITES)) if(haversine(lat,lng,s.lat,s.lng)<=s.r) return n;
+  return null;
+}
+
+function startGPS(){
+  if(!navigator.geolocation){
+    updateGPSUI('timeout',null); return;
+  }
+  let done=false;
+
+  // Timeout JS de 5 secondes — contourne les bugs iPhone où getCurrentPosition ne rappelle jamais
+  const killTimer=setTimeout(()=>{
+    if(done) return;
+    done=true;
+    if(gpsWatch!==null){ navigator.geolocation.clearWatch(gpsWatch); gpsWatch=null; }
+    S.gpsStatus='timeout'; S.detectedSite=null;
+    updateGPSUI('timeout',null);
+  },5000);
+
+  // On essaie d'abord un fix rapide avec maximumAge élevé (cache acceptable)
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      if(done) return; // si le timeout a déjà frappé, ignorer
+      done=true; clearTimeout(killTimer);
+      onGPS(pos);
+      // Continuer à surveiller pour mises à jour
+      gpsWatch=navigator.geolocation.watchPosition(onGPS, ()=>{}, {
+        enableHighAccuracy:true, timeout:10000, maximumAge:60000
+      });
+    },
+    err=>{
+      if(done) return;
+      done=true; clearTimeout(killTimer);
+      onGPSErr(err);
+    },
+    {enableHighAccuracy:true, timeout:4500, maximumAge:30000}
+  );
+}
+
+function onGPS(pos){
+  const{latitude:lat,longitude:lng,accuracy}=pos.coords;
+  S.gpsCoords={lat,lng,accuracy};
+  const site=detectSite(lat,lng);
+  S.detectedSite=site;
+  S.gpsStatus=site?site.toLowerCase().replace('é','e'):'unknown';
+  updateGPSUI(S.gpsStatus,{lat,lng,accuracy});
+}
+
+function onGPSErr(e){
+  S.gpsStatus='unknown'; S.detectedSite=null;
+  updateGPSUI('unknown',null);
+}
+
+function updateGPSUI(st,c){
+  const card=document.getElementById('gps-card');
+  const nm=document.getElementById('gps-site-name');
+  const mt=document.getElementById('gps-meta');
+  const za=document.getElementById('zone-alert');
+  card.className='gps-card '+st;
+  za.style.display='none';
+  if(st==='locating'){
+    nm.innerHTML='<span class="blink">Localisation GPS…</span>'; mt.textContent='Patientez…';
+  } else if(st==='bages'){
+    document.getElementById('gps-icon').textContent='✅';
+    nm.textContent='📍 Le Chaudron — Bages';
+    mt.textContent=c?`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}  ±${Math.round(c.accuracy)}m`:'';
+  } else if(st==='cabestany'){
+    document.getElementById('gps-icon').textContent='✅';
+    nm.textContent='📍 Le Chaudron — Cabestany';
+    mt.textContent=c?`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}  ±${Math.round(c.accuracy)}m`:'';
+  } else if(st==='timeout'){
+    document.getElementById('gps-icon').textContent='📍';
+    nm.textContent='Lieu non déterminé';
+    mt.textContent='GPS non disponible — pointage autorisé';
+    card.className='gps-card unknown';
+  } else {
+    // unknown (hors zone avec coordonnées connues)
+    document.getElementById('gps-icon').textContent='⚠️';
+    nm.textContent='Position non reconnue';
+    mt.textContent=c?`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}  ±${Math.round(c.accuracy)}m`:'GPS indisponible';
+    za.style.display='';
+    document.getElementById('zone-coords').textContent=c?`Coords: ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`:'';
+  }
+}
+
+// ── LOCK NUMPAD ───────────────────────────────────────
+function buildLockPad(){
+  const c=document.getElementById('numpad-lock'); c.innerHTML='';
+  ['1','2','3','4','5','6','7','8','9','←','0','↵'].forEach(d=>{
+    const b=document.createElement('button');
+    b.className='num-btn'+(d==='↵'?' accent':'')+(d==='←'?' del':'');
+    b.textContent=d;
+    if(d==='0'){
+      b.addEventListener('pointerdown',()=>{if(!S.mgrPinMode) holdTimer=setTimeout(showMgrScreen,2500)});
+      b.addEventListener('pointerup',()=>clearTimeout(holdTimer));
+      b.addEventListener('pointerleave',()=>clearTimeout(holdTimer));
+      b.addEventListener('click',()=>addLD('0'));
+    } else if(d==='←') b.addEventListener('click',()=>{
+      if(lockBuf.length===0&&S.mgrPinMode){exitMgrMode();return}
+      lockBuf=lockBuf.slice(0,-1);dots('d',lockBuf.length);
+    });
+    else if(d==='↵') b.addEventListener('click',confirmLock);
+    else b.addEventListener('click',()=>addLD(d));
+    c.appendChild(b);
+  });
+}
+
+function addLD(d){if(lockBuf.length>=4)return;lockBuf+=d;dots('d',lockBuf.length);if(lockBuf.length===4)setTimeout(confirmLock,180)}
+
+function exitMgrMode(){
+  S.mgrPinMode=false;
+  document.body.classList.remove('mgr-mode');
+  const lp=document.getElementById('lock-prompt');
+  if(lp) lp.textContent='Entrez votre code';
+  lockBuf=''; dots('d',0);
+}
+
+function confirmLock(){
+  if(S.mgrPinMode){
+    if(hp(lockBuf)===G('managerPin')){
+      exitMgrMode();
+      S.mgrLogged=true;
+      document.getElementById('mgr-dash').style.display='';
+      refreshMgr();
+      showScreen('screen-manager');
+    } else {
+      lockBuf=''; dots('d',0);
+      showToast('Code manager incorrect','error');
+      shake('numpad-lock');
+    }
+    return;
+  }
+  const emp=getEmps().find(e=>e.pin===hp(lockBuf));
+  lockBuf=''; dots('d',0);
+  if(!emp){showToast('Code incorrect','error');shake('numpad-lock');return}
+  if(S.gpsStatus==='unknown'||S.gpsStatus==='timeout') showToast('⚠️ Lieu non déterminé — signalé','error');
+  S.currentEmp=emp;
+  // Determine next action automatically
+  const rec=getEmpRec(emp.id); const events=rec?.events||[];
+  const last=events[events.length-1];
+  const hasS=events.some(e=>e.type==='start'), hasE=events.some(e=>e.type==='end');
+  const inP=last?.type==='pause_start';
+  // If service already ended today, just show screen (no photo needed)
+  if(hasE){ showEmpScreen(emp); return; }
+  // Otherwise take silent photo immediately, then show screen
+  const action = !hasS ? 'start' : inP ? 'pause_end' : null;
+  // Only auto-photo on arrival (start) and return from pause — pause/end still need a tap
+  if(action){
+    S.currentAction=action;
+    silentPhoto(()=>{ recordEvent(action); showEmpScreen(emp); });
+  } else {
+    // Already in service or in pause start — show screen, photo on tap
+    showEmpScreen(emp);
+  }
+}
+
+function dots(prefix,n){for(let i=0;i<4;i++){const el=document.getElementById(prefix+i);if(el)el.classList.toggle('filled',i<n)}}
+function shake(id){const el=document.getElementById(id);[10,-10,6,-6,0].forEach((x,i)=>setTimeout(()=>el.style.transform=`translateX(${x}px)`,i*60))}
+
+// ── EMPLOYEE SCREEN ───────────────────────────────────
+function showEmpScreen(emp){
+  document.getElementById('emp-name-disp').textContent=emp.name;
+  const b=document.getElementById('emp-site-badge');
+  if(S.detectedSite) b.innerHTML=`<span class="site-pill ${S.detectedSite==='Bages'?'bages':'cabestany'}">📍 ${S.detectedSite}</span>`;
+  else b.innerHTML=`<span class="site-pill unknown">⚠️ Hors zone</span>`;
+  renderTL(emp); renderActions(emp); showScreen('screen-employee');
+}
+
+function renderTL(emp){
+  const rec=getEmpRec(emp.id);
+  const el=document.getElementById('emp-timeline');
+  if(!rec||!rec.events.length){el.innerHTML='<div style="color:var(--text3);font-size:.78rem;padding:5px 0">Aucune activité aujourd\'hui</div>';return}
+  const labs={start:'Prise de poste',pause_start:'Début pause',pause_end:'Fin pause',end:'Fin de service'};
+  const dc={start:'start',pause_start:'pause',pause_end:'pause',end:'end'};
+  el.innerHTML=rec.events.map(ev=>{
+    const t=ev.corrected?`<span class="corr">${ev.correctedTime||ev.time}</span>`:ev.time;
+    return`<div class="timeline-item"><div class="tl-dot ${dc[ev.type]||'start'}"></div><div class="tl-time">${t}</div><div class="tl-label">${labs[ev.type]||ev.type}</div>${ev.corrected?'<div class="tl-corr">✏️ corrigé</div>':''}</div>`;
+  }).join('');
+}
+
+function renderActions(emp){
+  const rec=getEmpRec(emp.id); const events=rec?.events||[];
+  const last=events[events.length-1];
+  const hasS=events.some(e=>e.type==='start'), hasE=events.some(e=>e.type==='end');
+  const inP=last?.type==='pause_start', inSvc=hasS&&!hasE&&!inP;
+  const c=document.getElementById('emp-actions');
+  if(hasE){
+    c.innerHTML='<div style="color:var(--success);font-size:.9rem;padding:20px;text-align:center;grid-column:span 2;line-height:1.6">✓ Service terminé.<br>Bonne soirée !</div>';
+    return;
+  }
+  let h='';
+  // Already handled start on PIN entry — but show it greyed if somehow not recorded
+  if(!hasS){
+    h+=`<button class="action-btn primary" onclick="tapAction('start')"><span class="bi">🟢</span>Début de service</button>`;
+  }
+  if(inSvc){
+    h+=`<button class="action-btn" onclick="tapAction('pause_start')" style="grid-column:span 1"><span class="bi">☕</span>Pause</button>`;
+    h+=`<button class="action-btn danger" onclick="tapAction('end')"><span class="bi">🔴</span>Fin de service</button>`;
+  }
+  if(inP){
+    h+=`<button class="action-btn primary" onclick="tapAction('pause_end')"><span class="bi">▶️</span>Reprendre le service</button>`;
+  }
+  c.innerHTML=h;
+}
+
+// Un seul tap → photo silencieuse → enregistrement → mise à jour écran
+function tapAction(action){
+  S.currentAction=action;
+  silentPhoto(()=>{ recordEvent(action); renderTL(S.currentEmp); renderActions(S.currentEmp); });
+}
+
+// ── PHOTO SILENCIEUSE ────────────────────────────────
+// Ouvre la caméra, capture après stabilisation, ferme — zéro interaction
+function silentPhoto(onDone){
+  const cv=document.getElementById('camera-canvas');
+  // Affiche un bref flash de chargement sur l'écran actif
+  showToast('📸 Enregistrement…','');
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    // Pas de caméra : photo placeholder
+    makePlaceholderPhoto(cv);
+    onDone();
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}}})
+    .then(stream=>{
+      const video=document.getElementById('camera-video');
+      video.srcObject=stream;
+      // Attendre que la caméra soit prête (500ms suffisent sur iPhone)
+      setTimeout(()=>{
+        cv.width=video.videoWidth||640;
+        cv.height=video.videoHeight||480;
+        const ctx=cv.getContext('2d');
+        ctx.drawImage(video,0,0,cv.width,cv.height);
+        stream.getTracks().forEach(t=>t.stop());
+        video.srcObject=null;
+        watermark(cv);
+        S.capturedPhoto=cv.toDataURL('image/jpeg',.85);
+        onDone();
+      },600);
+    })
+    .catch(()=>{
+      makePlaceholderPhoto(cv);
+      onDone();
+    });
+}
+
+function makePlaceholderPhoto(cv){
+  cv.width=640; cv.height=480;
+  const ctx=cv.getContext('2d');
+  ctx.fillStyle='#181818'; ctx.fillRect(0,0,640,480);
+  ctx.fillStyle='#2a2a2a'; ctx.beginPath(); ctx.arc(320,175,85,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#222'; ctx.beginPath(); ctx.ellipse(320,375,125,95,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(217,119,87,.3)'; ctx.font='500 18px Space Grotesk,system-ui,sans-serif'; ctx.textAlign='center';
+  ctx.fillText('Caméra non disponible',320,460);
+  watermark(cv);
+  S.capturedPhoto=cv.toDataURL('image/jpeg',.85);
+}
+
+function watermark(cv){
+  const ctx=cv.getContext('2d'), now=new Date();
+  const date=now.toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});
+  const time=now.toLocaleTimeString('fr-FR');
+  const site=S.detectedSite?`📍 ${S.detectedSite}`:'Lieu non déterminé';
+  const gps=S.gpsCoords?`GPS: ${S.gpsCoords.lat.toFixed(5)}, ${S.gpsCoords.lng.toFixed(5)}  ±${Math.round(S.gpsCoords.accuracy)}m`:'GPS non disponible';
+  const lines=[`Le Chaudron 66 — ${site}`,`${date}  ${time}`,S.currentEmp?.name||'',gps].filter(Boolean);
+  const lh=19, pad=12, boxH=lines.length*lh+pad*2;
+  ctx.fillStyle='rgba(0,0,0,.72)'; ctx.fillRect(0,cv.height-boxH,cv.width,boxH);
+  lines.forEach((l,i)=>{
+    ctx.font=i===0?'bold 13px Arial':i===3?'10px Courier New,monospace':'12px Arial';
+    ctx.fillStyle=i===0?'#D97757':i===3?'rgba(255,255,255,.45)':'rgba(255,255,255,.88)';
+    ctx.fillText(l,pad,cv.height-boxH+pad+i*lh+3);
+  });
+}
+
+// ── ENREGISTREMENT ÉVÉNEMENT ─────────────────────────
+function recordEvent(action){
+  const now=new Date(), timeStr=now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const emp=S.currentEmp, site=S.detectedSite||'Lieu non déterminé';
+  let rec=getEmpRec(emp.id)||newRec(emp.id,site);
+  rec.events.push({
+    type:action, time:timeStr, timestamp:now.toISOString(),
+    site, gps:S.gpsCoords, outOfZone:!S.detectedSite,
+    photo:S.capturedPhoto, corrected:false
+  });
+  saveRec(rec);
+  const labs={start:'Prise de poste enregistrée ✓',pause_start:'Pause enregistrée ✓',pause_end:'Reprise enregistrée ✓',end:'Fin de service enregistrée ✓'};
+  showToast(labs[action]||'Enregistré ✓','success');
+  S.capturedPhoto=null;
+}
+
+function logout(){S.currentEmp=null;lockBuf='';dots('d',0);showScreen('screen-lock')}
+
+// ── MANAGER ───────────────────────────────────────────
+function showMgrScreen(){
+  if(S.mgrPinMode) return;
+  lockBuf=''; dots('d',0);
+  S.mgrPinMode=true;
+  document.body.classList.add('mgr-mode');
+  const lp=document.getElementById('lock-prompt');
+  if(lp) lp.textContent='Code manager';
+}
+
+function buildPad(cid,onD,onDel,onConf){
+  const c=document.getElementById(cid); c.innerHTML='';
+  ['1','2','3','4','5','6','7','8','9','←','0','↵'].forEach(d=>{
+    const b=document.createElement('button');
+    b.className='num-btn'+(d==='↵'?' accent':'');
+    b.textContent=d;
+    if(d==='←') b.addEventListener('click',onDel);
+    else if(d==='↵') b.addEventListener('click',onConf);
+    else b.addEventListener('click',()=>onD(d));
+    c.appendChild(b);
+  });
+}
+
+function confirmMgr(){
+  // Conservé pour compatibilité — le flux passe maintenant par confirmLock()
+}
+
+function mgrLogout(){
+  S.mgrLogged=false;
+  document.getElementById('mgr-dash').style.display='none';
+  showScreen('screen-lock');
+}
+
+function refreshMgr(){
+  document.getElementById('today-lbl').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  document.getElementById('exp-month').textContent='Mois de '+new Date().toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  renderTodayTbl(); renderEmpList();
+  const p=G('pendingSync',[]); document.getElementById('sync-info').textContent=p.length?`${p.length} entrée(s) en attente.`:'✓ Tout est synchronisé.';
+}
+
+function switchTab(id){
+  const ts=['t-today','t-hist','t-emp','t-exp'];
+  ts.forEach(t=>document.getElementById(t).style.display='none');
+  document.getElementById(id).style.display='';
+  document.querySelectorAll('.mgr-tab').forEach((b,i)=>b.classList.toggle('active',ts[i]===id));
+  if(id==='t-hist'){document.getElementById('hist-dp').value=todayKey();loadHist()}
+}
+
+function flt(site){
+  siteFlt=site;
+  ['f-all','f-bag','f-cab'].forEach(id=>{document.getElementById(id).style.cssText=''});
+  const m={all:'f-all',Bages:'f-bag',Cabestany:'f-cab'};
+  const el=document.getElementById(m[site]);
+  if(el){el.style.borderColor='var(--accent)';el.style.color='var(--accent)'}
+  renderTodayTbl();
+}
+
+function renderTodayTbl(){
+  const dk=todayKey(), emps=getEmps(), recs=getRecs().filter(r=>r.date===dk);
+  const rows=emps.filter(e=>siteFlt==='all'||recs.find(r=>r.empId===e.id&&r.site===siteFlt));
+  const tbody=document.getElementById('today-tbody');
+  tbody.innerHTML=rows.map(e=>buildRow(e,recs.find(r=>r.empId===e.id),dk,true)).join('');
+  if(!rows.length) tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:18px">Aucun employé sur ce site</td></tr>';
+}
+
+function buildRow(emp,rec,dk,showP){
+  const evs=rec?.events||[];
+  const sEv=evs.find(e=>e.type==='start'), eEv=evs.find(e=>e.type==='end');
+  const site=rec?.site||'—'; const tot=calcTot(evs);
+  const totStr=tot>0?`${Math.floor(tot/60)}h${String(tot%60).padStart(2,'0')}`:'—';
+  const st=t=>t?(t.corrected?`<span class="corr">${t.correctedTime||t.time}</span>`:t.time):'—';
+  const last=evs[evs.length-1]; const inP=last?.type==='pause_start'; const hasS=!!sEv, hasE=!!eEv;
+  let stat='<span class="badge bo">Non pointé</span>';
+  if(hasS&&!hasE) stat=inP?'<span class="badge bp">Pause</span>':'<span class="badge bw">En service</span>';
+  else if(hasE) stat='<span class="badge bo">Terminé</span>';
+  const sc=site==='Bages'?'bb':site==='Cabestany'?'bc':'';
+  const oz=sEv?.outOfZone?'⚠️':'';
+  const ph=sEv?.photo?`<img class="photo-thumb" src="${sEv.photo}" onclick="viewPh('${emp.id}','${dk}')">`:'<div style="width:32px;height:32px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:.8rem">👤</div>';
+  const pCol=showP?`<td style="font-size:.7rem;color:var(--text3)">${evs.filter(e=>e.type==='pause_start').length||'—'}</td>`:'';
+  const gCol=!showP?`<td style="font-size:.7rem">${oz||(sEv?.gps?'✓':'—')}</td>`:'';
+  const stCol=showP?`<td>${stat}</td>`:'';
+  return`<tr><td>${ph}</td><td>${emp.name}</td><td><span class="badge ${sc}">${site}</span>${oz?` <span title="Hors zone">⚠️</span>`:''}</td><td>${st(sEv)}</td>${pCol}<td>${st(eEv)}</td>${gCol}<td style="font-family:var(--font-mono)">${totStr}</td>${stCol}<td><button class="sb" style="font-size:.68rem;padding:4px 8px" onclick="openEdit('${emp.id}','${dk}')">✏️</button></td></tr>`;
+}
+
+function calcTot(evs){
+  let tot=0,sTs=null,pTs=null;
+  evs.forEach(ev=>{
+    const t=ev.corrected&&ev.correctedTime?pt(ev.correctedTime):pt(ev.time);
+    if(ev.type==='start') sTs=t;
+    if(ev.type==='pause_start'&&sTs!==null) pTs=t;
+    if(ev.type==='pause_end'&&pTs!==null){tot-=(t-pTs);pTs=null}
+    if(ev.type==='end'&&sTs!==null) tot+=(t-sTs);
+  });
+  return Math.max(0,Math.round(tot/60000));
+}
+function pt(hm){const[h,m]=(hm||'0:0').split(':').map(Number);const d=new Date();d.setHours(h,m,0,0);return d.getTime()}
+
+function loadHist(){
+  const dk=document.getElementById('hist-dp').value; if(!dk) return;
+  const emps=getEmps(), recs=getRecs().filter(r=>r.date===dk);
+  document.getElementById('hist-tbody').innerHTML=emps.map(e=>buildRow(e,recs.find(r=>r.empId===e.id),dk,false)).join('');
+}
+
+function renderEmpList(){
+  document.getElementById('emp-tbody').innerHTML=getEmps().map(e=>`<tr><td>${e.name}</td><td style="font-family:var(--font-mono)">••••</td><td style="font-size:.7rem;color:var(--text3)">${new Date(e.createdAt).toLocaleDateString('fr-FR')}</td><td><button class="sb danger" style="font-size:.68rem;padding:4px 8px" onclick="delEmp('${e.id}')">✕</button></td></tr>`).join('');
+}
+
+function addEmp(){
+  const name=document.getElementById('ne-name').value.trim(), pin=document.getElementById('ne-pin').value.trim();
+  if(!name||pin.length!==4||isNaN(pin)){showToast('Nom + PIN 4 chiffres requis','error');return}
+  const emps=getEmps();
+  if(emps.some(e=>e.pin===hp(pin))){showToast('Ce PIN existe déjà','error');return}
+  emps.push({id:'e'+Date.now(),name,pin:hp(pin),createdAt:new Date().toISOString()});
+  S_('employees',emps); document.getElementById('ne-name').value=''; document.getElementById('ne-pin').value='';
+  renderEmpList(); showToast(`${name} ajouté(e) ✓`,'success');
+}
+
+function delEmp(id){S_('employees',getEmps().filter(e=>e.id!==id));renderEmpList();showToast('Employé supprimé','success')}
+
+// ── EDIT ──────────────────────────────────────────────
+function openEdit(empId,dk){
+  const rec=getRecs().find(r=>r.empId===empId&&r.date===dk);
+  const sEv=rec?.events?.find(e=>e.type==='start'), eEv=rec?.events?.find(e=>e.type==='end');
+  document.getElementById('edit-key').value=`${empId}|${dk}`;
+  document.getElementById('edit-start').value=sEv?(sEv.correctedTime||sEv.time):'';
+  document.getElementById('edit-end').value=eEv?(eEv.correctedTime||eEv.time):'';
+  document.getElementById('edit-why').value='';
+  openM('m-edit');
+}
+
+function saveEdit(){
+  const[empId,dk]=document.getElementById('edit-key').value.split('|');
+  const ns=document.getElementById('edit-start').value, ne=document.getElementById('edit-end').value;
+  const why=document.getElementById('edit-why').value||'Correction manager';
+  const recs=getRecs(); let rec=recs.find(r=>r.empId===empId&&r.date===dk);
+  if(!rec){rec=newRec(empId,'?');recs.push(rec)}
+  if(ns){let ev=rec.events.find(e=>e.type==='start');if(ev){ev.corrected=true;ev.correctedTime=ns}else rec.events.unshift({type:'start',time:ns,corrected:true,correctedTime:ns,timestamp:new Date().toISOString(),site:rec.site})}
+  if(ne){let ev=rec.events.find(e=>e.type==='end');if(ev){ev.corrected=true;ev.correctedTime=ne}else rec.events.push({type:'end',time:ne,corrected:true,correctedTime:ne,timestamp:new Date().toISOString(),site:rec.site})}
+  if(!rec.correctionLog) rec.correctionLog=[];
+  rec.correctionLog.push({ts:new Date().toISOString(),why,ns,ne});
+  S_('records',recs); closeM('m-edit'); renderTodayTbl();
+  if(document.getElementById('t-hist').style.display!=='none') loadHist();
+  showToast('Correction enregistrée ✓','success');
+}
+
+// ── PHOTO VIEWER ─────────────────────────────────────
+function viewPh(empId,dk){
+  const rec=getRecs().find(r=>r.empId===empId&&r.date===dk);
+  const emp=getEmps().find(e=>e.id===empId);
+  const ev=rec?.events?.find(e=>e.type==='start');
+  if(!ev?.photo) return;
+  document.getElementById('pv-img').src=ev.photo;
+  const gps=ev.gps?`GPS: ${ev.gps.lat.toFixed(5)}, ${ev.gps.lng.toFixed(5)} ±${Math.round(ev.gps.accuracy)}m`:'GPS non enregistré';
+  document.getElementById('pv-info').innerHTML=`${emp?.name} — ${dk}<br>📍 ${rec?.site||'?'} &nbsp; 🕐 ${ev.time}${ev.corrected?' ✏️':''}<br><span style="opacity:.5">${gps}</span>${ev.outOfZone?'<br><span style="color:var(--danger)">⚠️ Hors zone au moment du pointage</span>':''}`;
+  openM('m-photo');
+}
+
+// ── EXPORT ────────────────────────────────────────────
+function exportCSV(mode){
+  const emps=getEmps(); let recs=getRecs();
+  if(mode==='today') recs=recs.filter(r=>r.date===todayKey());
+  else{const m=new Date().toISOString().slice(0,7);recs=recs.filter(r=>r.date.startsWith(m))}
+  const hdr='Employé;Date;Site;Début;Fin;Total;Pauses;Hors zone;Correction;GPS Lat;GPS Lng;GPS Précision';
+  const rows=recs.map(rec=>{
+    const emp=emps.find(e=>e.id===rec.empId);
+    const evs=rec.events;
+    const sEv=evs.find(e=>e.type==='start'), eEv=evs.find(e=>e.type==='end');
+    const tot=calcTot(evs); const totS=tot>0?`${Math.floor(tot/60)}h${String(tot%60).padStart(2,'0')}`:'0h00';
+    const gps=sEv?.gps?`${sEv.gps.lat.toFixed(5)};${sEv.gps.lng.toFixed(5)};±${Math.round(sEv.gps.accuracy)}m`:';;';
+    return`${emp?.name||rec.empId};${rec.date};${rec.site};${sEv?.correctedTime||sEv?.time||''};${eEv?.correctedTime||eEv?.time||''};${totS};${evs.filter(e=>e.type==='pause_start').length};${evs.some(e=>e.outOfZone)?'Oui':'Non'};${evs.some(e=>e.corrected)?'Oui':'Non'};${gps}`;
+  });
+  const blob=new Blob(['\uFEFF'+[hdr,...rows].join('\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`chaudron66_${mode==='today'?todayKey():'mois'}.csv`; a.click();
+  showToast('Export CSV téléchargé ✓','success');
+}
+
+function syncNow(){
+  if(!S.isOnline){showToast('Pas de connexion','error');return}
+  showToast('Synchronisation…','');
+  setTimeout(()=>{S_('pendingSync',[]);refreshMgr();showToast('Synchronisation complète ✓','success')},1400);
+}
+
+// ── PIN CHANGE ────────────────────────────────────────
+function changeMgrPin(){
+  npBuf=''; dots('np',0);
+  buildPad('numpad-np',
+    d=>{if(npBuf.length<4){npBuf+=d;dots('np',npBuf.length);if(npBuf.length===4)setTimeout(saveNP,200)}},
+    ()=>{npBuf=npBuf.slice(0,-1);dots('np',npBuf.length)},
+    saveNP
+  );
+  openM('m-pin');
+}
+function saveNP(){if(npBuf.length!==4)return;S_('managerPin',hp(npBuf));closeM('m-pin');showToast('Code manager modifié ✓','success')}
+
+function purge(){
+  const c=new Date(); c.setDate(c.getDate()-31); const k=c.toISOString().slice(0,10);
+  S_('records',getRecs().filter(r=>r.date>=k));
+}
+
+// ── MODAL ─────────────────────────────────────────────
+function openM(id){document.getElementById(id).classList.add('open')}
+function closeM(id){document.getElementById(id).classList.remove('open')}
+
+// ── TOAST ─────────────────────────────────────────────
+let _tt=null;
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');
+  if(!t) return;
+  t.textContent=msg; t.className='toast'+(type?' '+type:''); t.classList.add('show');
+  if(_tt) clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ── BOOT ──────────────────────────────────────────────
+// Tout dans DOMContentLoaded — seul moyen fiable sur iPhone Safari en file://
+document.addEventListener('DOMContentLoaded', function() {
+  // Horloge
+  tickClock();
+  setInterval(tickClock, 1000);
+  // Connectivité
+  window.addEventListener('online', updOnline);
+  window.addEventListener('offline', updOnline);
+  updOnline();
+  // App
+  initStorage();
+  buildLockPad();
+  purge();
+  startGPS();
+  showScreen('screen-lock');
+  // Fermeture modales au clic extérieur
+  document.querySelectorAll('.modal-overlay').forEach(m =>
+    m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); })
+  );
+});
+</script>
+</body>
+</html>
