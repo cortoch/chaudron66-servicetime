@@ -1,0 +1,29 @@
+{
+  "tenant_id": "a1b2c3d4-0001-0001-0001-chaudron6601",
+  "company_name": "Le Chaudron 66",
+  "primary_color": "#c8913a",
+  "primary_color_light": "#e8b86d",
+  "logo_base64": "",
+  "sites": [
+    {
+      "id": "bages",
+      "name": "Bages",
+      "label": "Le Chaudron — Bages",
+      "lat": 42.6040,
+      "lng": 2.8983,
+      "radius_m": 150,
+      "address": "1 rue du Cinéma, 66670 Bages",
+      "badge_class": "bb"
+    },
+    {
+      "id": "cabestany",
+      "name": "Cabestany",
+      "label": "Le Chaudron — Cabestany",
+      "lat": 42.6725,
+      "lng": 2.9430,
+      "radius_m": 150,
+      "address": "20 av. André Ampère, 66330 Cabestany",
+      "badge_class": "bc"
+    }
+  ]
+}
