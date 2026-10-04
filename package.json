@@ -1,0 +1,19 @@
+{
+  "name": "ylelor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:schema": "node scripts/apply-schema.mjs",
+    "tenant:create": "node scripts/create-tenant.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
