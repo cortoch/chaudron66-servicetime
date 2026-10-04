@@ -1,5 +1,11 @@
 # Ylelor — Documentation projet
-## Mise à jour : avril 2026
+## Mise à jour : octobre 2026
+
+> ### ⚠️ État au 4 octobre 2026 — à lire en premier
+> - **La partie en ligne (Supabase) et la partie photo ont été supprimées.** `index.html` sur `main` est une version 100 % locale (localStorage, préfixe `ch66_`). Les sections Supabase / photos plus bas décrivent l'ancienne version et sont **obsolètes**.
+> - **Supabase n'est plus une option** (plan gratuit plein). Nouveau backend retenu : **Neon (Postgres UE) + Netlify Functions**, sur la branche `backend-neon` (voir `BACKEND.md`).
+> - Modèle de la branche : pointages en ajout seul (UUID appareil, synchro idempotente par curseurs), corrections/annulations en lignes séparées, employés « dernière écriture gagne ». Appareils enrôlés par code manager (≥ 6 caractères), jetons révocables. 11 tests d'intégration (`npm test`).
+> - **Reste à faire :** brancher `js/sync.js` dans `index.html` et `dashboard.html` ; créer le projet Neon (Francfort), `npm run db:schema`, `npm run tenant:create` ; variables Netlify `DATABASE_URL` + `TOKEN_SECRET` ; fusionner `backend-neon` ; réécrire ce fichier.
 
 ---
 
